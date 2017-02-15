@@ -1,0 +1,16 @@
+[DEFAULT]
+#
+# From xcat3
+#
+rpc_backend = rabbit
+log_dir = /var/log/xcat3
+rpc_response_timeout = 3600
+transport_url = rabbit://xcat3:cluster@127.0.0.1:5672/
+
+[database]
+connection = mysql+pymysql://xcat3:cluster@127.0.0.1/xcat3?charset=utf8
+backend = sqlalchemy
+
+
+[conductor]
+#workers_pool_size = 20000

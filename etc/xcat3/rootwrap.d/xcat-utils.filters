@@ -1,0 +1,10 @@
+# xcat3-rootwrap command filters for disk manipulation
+# This file should be owned by (and only-writable by) the root user
+
+[Filters]
+# xcat3/drivers/modules/deploy_utils.py
+iscsiadm: CommandFilter, iscsiadm, root
+
+# xcat3/common/utils.py
+mount: CommandFilter, mount, root
+umount: CommandFilter, umount, root

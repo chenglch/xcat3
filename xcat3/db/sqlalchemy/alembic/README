@@ -1,0 +1,12 @@
+Please see https://alembic.readthedocs.org/en/latest/index.html for general documentation
+
+To create alembic migrations use:
+$ xcat3-dbsync revision --message --autogenerate
+
+Stamp db with most recent migration version, without actually running migrations
+$ xcat3-dbsync stamp --revision head
+
+Upgrade can be performed by:
+$ xcat3-dbsync - for backward compatibility
+$ xcat3-dbsync upgrade
+# xcat3-dbsync upgrade --revision head
