@@ -7,6 +7,14 @@ class ControlInterface(base.BaseInterface):
     """Interface for hardware control actions."""
 
     @abc.abstractmethod
+    def validate(self, node):
+        """validate the specific attribute
+
+        :param node: the node to act on.
+        :raises: MissingParameterValue if a required parameter is missing.
+        """
+
+    @abc.abstractmethod
     def get_power_state(self, node):
         """Return the power state of the node
 

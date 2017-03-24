@@ -94,6 +94,7 @@ class ConductorManager(base_manager.BaseConductorManager):
 
         def _change_power_state(node, target):
             control_plugin, os_plugin, boot_plugin = mapping.get_plugin(node)
+            control_plugin.validate(node)
             control_plugin.set_power_state(node, target)
 
         with task_manager.acquire(context, names,
@@ -101,6 +102,34 @@ class ConductorManager(base_manager.BaseConductorManager):
             result = self._process_nodes_worker(_change_power_state,
                                                 nodes=task.nodes,
                                                 target=target)
+            return result
+
+    @messaging.expected_exceptions(exception.InvalidParameterValue,
+                                   exception.NoFreeConductorWorker,
+                                   exception.NodeLocked)
+    def get_power_state(self, context, names):
+        """RPC method to get a node's power state.
+
+        :param context: an admin context.
+        :param names: the names of nodes.
+        :raises: NoFreeConductorWorker when there is no free worker to start
+                 async task.
+        :raises: InvalidParameterValue
+        :raises: MissingParameterValue
+
+        """
+        LOG.info("RPC get_power_state called for nodes %(nodes)s. " %
+                 {'nodes': str(names)})
+
+        def _get_power_state(node):
+            control_plugin, os_plugin, boot_plugin = mapping.get_plugin(node)
+            control_plugin.validate(node)
+            return control_plugin.get_power_state(node)
+
+        with task_manager.acquire(context, names,
+                                  purpose='nodes deletion') as task:
+            result = self._process_nodes_worker(_get_power_state,
+                                                nodes=task.nodes)
             return result
 
     @messaging.expected_exceptions(exception.InvalidParameterValue,

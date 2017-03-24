@@ -16,8 +16,8 @@ def gen_data(n=10):
         d['mgt'] = 'ipmi'
         d['arch'] = 'x86_64' if i % 2 == 0 else 'ppc64le'
         d['control_info'] = {
-            'ipmi_address': '11.0.%d.%d' % (num[0], num[1]),
-            'ipmi_user': 'admin', 'ipmi_password': 'password'}
+            'bmc_address': '11.0.%d.%d' % (num[0], num[1]),
+            'bmc_username': 'admin', 'bmc_password': 'password'}
         d['nics_info'] = {
             'nics': [{'mac': '42:87:0a:05:%02x:%02x' % (num[0], num[1]),
                       'ip': '12.0.%d.%d' % (num[0], num[1]),

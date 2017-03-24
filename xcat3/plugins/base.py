@@ -5,7 +5,7 @@ import six
 class BaseInterface(object):
     @abc.abstractmethod
     def validate(self, node):
-        """Validate the driver-specific Node deployment info.
+        """Validate the plugin-specific Node deployment info.
 
         This method is often executed synchronously in API requests, so it
         should not conduct long-running checks.

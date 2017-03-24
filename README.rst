@@ -204,11 +204,22 @@ Modify Node
 Power on Nodes
 ::
 
-  curl -XPUT 'http://localhost:3010/v1/nodes/states/power?target=on' -H Content-Type:application/json -d '{"nodes":[{"name":"test_xcat3"}, {"name":"test_xcat4"}]}' | jq .
+  curl -XPUT 'http://localhost:3010/v1/nodes/power?target=on' -H Content-Type:application/json -d '{"nodes":[{"name":"test_xcat3"}, {"name":"test_xcat4"}]}' | jq .
   {
     "nodes": {
         "test_xcat3": "ok",
         "test_xcat4": "plugin for None could not been loaded."
+    }
+  }
+
+Get power status of nodes
+::
+
+  curl -XGET 'http://localhost:3010/v1/nodes/power' -H Content-Type:application/json -d '{"nodes":[{"name":"test_xcat3"}, {"name":"test_xcat4"}]}' | jq .
+  {
+    "nodes": {
+        "test_xcat3": "on",
+        "test_xcat4": "on"
     }
   }
 

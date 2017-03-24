@@ -1,14 +1,25 @@
 from oslo_log import log
 from xcat3.plugins.control import base
 from xcat3.common import exception
+from xcat3.common.i18n import _, _LE, _LI, _LW
+
+from xcat3.common import states
 
 LOG = log.getLogger(__name__)
 
 
 class IPMIPlugin(base.ControlInterface):
     def validate(self, node):
-        """check the attribute of ipmi_address, ipmi_user"""
-        pass
+        """check the ipmi specific attributes"""
+        # TODO
+        bmc_address = node.control_info.get('bmc_address')
+        bmc_username = node.control_info.get('bmc_username')
+        if not bmc_address:
+            raise exception.MissingParameterValue(
+                _("IPMI address was not specified."))
+        if not bmc_username:
+            raise exception.MissingParameterValue(
+                _("IPMI username was not specified."))
 
     def get_power_state(self, node):
         """Return the power state of the node
@@ -17,7 +28,7 @@ class IPMIPlugin(base.ControlInterface):
         :raises: MissingParameterValue if a required parameter is missing.
         :returns: a power state.
         """
-        return 'on'
+        return states.POWER_ON
 
     def set_power_state(self, node, power_state):
         """Set the power state of the node's node.

@@ -146,6 +146,31 @@ class ConductorAPI(object):
 
         return futures
 
+    def get_power_state(self, context, names):
+        """Get a node's power state.
+
+        Synchronously, acquire lock and start the conductor background task
+        to change power state of a node.
+
+        :param context: request context.
+        :param names: names of nodes.
+        :raises: NoFreeConductorWorker when there is no free worker to start
+                 async task.
+        """
+
+        def _get_power_state(cctxt, names):
+            return cctxt.call(context, 'get_power_state', names=names)
+
+        topic_dict = self.get_topic_for(names)
+        futures = []
+        for topic, nodes in topic_dict.items():
+            cctxt = self.client.prepare(topic=topic or self.topic,
+                                        version='1.0')
+            future = self.spawn_worker(_get_power_state, cctxt, names=nodes)
+            futures.append(future)
+
+        return futures
+
     def destroy_nodes(self, context, names):
         """Change a node's power state.
 

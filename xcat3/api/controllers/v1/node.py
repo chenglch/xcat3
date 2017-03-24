@@ -40,6 +40,9 @@ LOG = log.getLogger(__name__)
 _DEFAULT_RETURN_FIELDS = ('name', 'reservation', 'created_at', 'nics_info',
                           'state', 'task_action', 'type', 'arch', 'mgt',
                           'updated_at')
+
+_REST_RESOURCE = ('power')
+
 ALLOWED_TARGET_POWER_STATES = (xcat3_states.POWER_ON,
                                xcat3_states.POWER_OFF,
                                xcat3_states.REBOOT,
@@ -244,25 +247,25 @@ class NodeStates(base.APIBase):
         return sample
 
 
-class NodeStatesController(rest.RestController):
-    _custom_actions = {
-        'power': ['PUT'],
-    }
+class NodePowerController(rest.RestController):
 
-    @expose.expose(NodeStates, types.name)
-    def get(self, node_name):
+    @expose.expose(types.jsontype, body=NodeCollection)
+    def get(self, nodes):
         """List the states of the node.
 
         :param node_name: The name of a node.
         """
-        node_obj = Node.get_api_node(node_name)
-        return NodeStates.convert(node_obj)
+        names = [node.name for node in nodes.nodes if node.name]
+        futures = pecan.request.rpcapi.get_power_state(
+            pecan.request.context, names)
+        result = _wait_rpc_result(futures, names)
+        return result
 
     @expose.expose(types.jsontype, wtypes.text,
                    wtypes.text,
                    body=NodeCollection,
                    status_code=http_client.ACCEPTED)
-    def power(self, target, nodes):
+    def put(self, target, nodes):
         """Set the power state of the node.
 
         :param target: The desired power state of the node.
@@ -291,7 +294,7 @@ class NodeStatesController(rest.RestController):
 
 
 class NodesController(rest.RestController):
-    states = NodeStatesController()
+    power = NodePowerController()
     invalid_sort_key_list = ['name']
 
     def _check_names_acceptable(self, names, error_msg):
@@ -316,6 +319,8 @@ class NodesController(rest.RestController):
 
     def _create(self, node):
         context = pecan.request.context
+        if node.name in _REST_RESOURCE:
+            raise exception.InvalidName(name=node.name)
         new_node = objects.Node(context, **node.as_dict())
         new_node.create()
 
