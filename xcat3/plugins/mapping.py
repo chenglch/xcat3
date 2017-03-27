@@ -1,12 +1,13 @@
 from oslo_log import log
 from xcat3.common import exception
 from xcat3.plugins.control import ipmi
+from xcat3.plugins.control import openbmc
 
 LOG = log.getLogger(__name__)
 
 plugin_map = dict()
 plugin_map['ipmi'] = ipmi.IPMIPlugin()
-
+plugin_map['openbmc'] = openbmc.OPENBMCPlugin()
 
 def get_plugin(node):
     control_plugin = plugin_map.get(node.mgt)

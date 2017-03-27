@@ -58,3 +58,13 @@ SOFT_POWER_OFF = 'soft power off'
 FAIL = 'failed'
 SUCCESS = 'ok'
 DELETED = 'deleted'
+
+################
+# Power command
+################
+
+POWER_COMMAND_ON = 'on'
+POWER_COMMAND_OFF = 'off'
+POWER_COMMAND_BOOT = 'boot'
+POWER_COMMAND_RESET = 'reset'
+
