@@ -65,7 +65,8 @@ class Conductor(base.XCAT3Object, object_base.VersionedObjectDictCompat):
     # Implications of calling new remote procedures should be thought through.
     # @object_base.remotable
     @classmethod
-    def register(cls, context, hostname, update_existing=False):
+    def register(cls, context, hostname, service='conductor',
+                 update_existing=False):
         """Register an active conductor with the cluster.
 
         :param hostname: the hostname on which the conductor will run
@@ -78,8 +79,9 @@ class Conductor(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         :returns: a :class:`Conductor` object.
 
         """
-        db_cond = cls.dbapi.register_conductor({'hostname': hostname},
-                                               update_existing=update_existing)
+        db_cond = cls.dbapi.register_conductor(
+            {'hostname': hostname, 'service': service},
+            update_existing=update_existing)
         return cls._from_db_object(cls(context), db_cond)
 
     # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable

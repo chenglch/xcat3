@@ -68,3 +68,5 @@ POWER_COMMAND_OFF = 'off'
 POWER_COMMAND_BOOT = 'boot'
 POWER_COMMAND_RESET = 'reset'
 
+
+ERROR = 'error'

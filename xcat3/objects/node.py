@@ -136,7 +136,7 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         return nodes
 
     @classmethod
-    def list_in(cls, context, names, filters=None):
+    def list_in(cls, context, names, filters=None, objs=['nics']):
         """Return a list of Node objects within the names
 
 
@@ -144,9 +144,10 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         """
         db_nodes = cls.dbapi.get_node_in(names, filters)
         nodes = cls._from_db_object_list(context, db_nodes)
-        for node in nodes:
-            nics_info = cls._get_nics_info(context, node.id)
-            setattr(node, 'nics_info', nics_info)
+        if objs and 'nics' in objs:
+            for node in nodes:
+                nics_info = cls._get_nics_info(context, node.id)
+                setattr(node, 'nics_info', nics_info)
         return nodes
 
     # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable

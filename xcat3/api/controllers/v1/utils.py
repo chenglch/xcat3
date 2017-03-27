@@ -106,11 +106,6 @@ def is_path_updated(patch, path):
         return p['path'] == path or p['path'].startswith(path + '/')
 
 
-def allow_node_logical_names():
-    # v1.5 added logical name aliases
-    return pecan.request.version.minor >= versions.MINOR_5_NODE_NAME
-
-
 def get_node_obj(node):
     """Get the RPC node from the node name.
 

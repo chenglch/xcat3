@@ -185,11 +185,11 @@ class TaskManager(object):
         self._nodes = None
         self.node_names = node_names
         self.shared = shared
-
         self._purpose = purpose
         self._debug_timer = timeutils.StopWatch()
 
-        nodes = objects.Node.list_in(context, node_names, ['reservation'])
+        nodes = objects.Node.list_in(context, node_names,
+                                     filters=['reservation'], objs=None)
         # As lock for multiple nodes is hard to detect the real problem, check
         # posibble error at first.
         if len(nodes) != node_names:

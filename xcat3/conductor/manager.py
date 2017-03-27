@@ -29,7 +29,9 @@ from xcat3.conductor import task_manager
 from xcat3.conf import CONF
 from xcat3 import objects
 from xcat3.common import states as xcat3_states
+from xcat3.common import ip_lib
 from xcat3.common.i18n import _, _LE, _LI, _LW
+from xcat3.dhcp import dhcp
 from xcat3.plugins import mapping
 
 MANAGER_TOPIC = 'xcat3.conductor_manager'
@@ -93,12 +95,12 @@ class ConductorManager(base_manager.BaseConductorManager):
                  {'nodes': str(names), 'target': target})
 
         def _change_power_state(node, target):
-            control_plugin, os_plugin, boot_plugin = mapping.get_plugin(node)
+            control_plugin = mapping.get_control_plugin(node)
             control_plugin.validate(node)
             control_plugin.set_power_state(node, target)
 
         with task_manager.acquire(context, names,
-                                  purpose='nodes deletion') as task:
+                                  purpose='change power state') as task:
             result = self._process_nodes_worker(_change_power_state,
                                                 nodes=task.nodes,
                                                 target=target)
@@ -122,12 +124,12 @@ class ConductorManager(base_manager.BaseConductorManager):
                  {'nodes': str(names)})
 
         def _get_power_state(node):
-            control_plugin, os_plugin, boot_plugin = mapping.get_plugin(node)
+            control_plugin = mapping.get_control_plugin(node)
             control_plugin.validate(node)
             return control_plugin.get_power_state(node)
 
         with task_manager.acquire(context, names,
-                                  purpose='nodes deletion') as task:
+                                  purpose='get power state') as task:
             result = self._process_nodes_worker(_get_power_state,
                                                 nodes=task.nodes)
             return result
@@ -158,4 +160,100 @@ class ConductorManager(base_manager.BaseConductorManager):
 
             for node in nodes:
                 result[node.name] = xcat3_states.DELETED
+            return result
+
+    @messaging.expected_exceptions(exception.InvalidParameterValue,
+                                   exception.NoFreeConductorWorker,
+                                   exception.NodeLocked)
+    def provision(self, context, names, target):
+        """RPC method to encapsulate changes to a node's state.
+
+        :param context: an admin context.
+        :param names: the names of nodes.
+        :param target: the desired power state of the node.
+        :raises: NoFreeConductorWorker when there is no free worker to start
+                 async task.
+        :raises: InvalidParameterValue
+        :raises: MissingParameterValue
+
+        """
+        LOG.info("RPC provision called for nodes %(nodes)s. "
+                 "The desired new state is %(target)s.",
+                 {'nodes': str(names), 'target': target})
+
+        def _provision(node, target):
+
+            # control_plugin, os_plugin, boot_plugin = mapping.get_plugin(node)
+            # control_plugin.validate(node)
+            # control_plugin.set_power_state(node, target)
+            pass
+
+        with task_manager.acquire(context, names,
+                                  purpose='nodes provision') as task:
+            result = self._process_nodes_worker(_provision,
+                                                nodes=task.nodes,
+                                                target=target)
+
+            #dhcp_topic = self.dhcp_api.get_topic_for()
+            self.dhcp_api.provision(context, names, target=target)
+
+            return result
+
+    @messaging.expected_exceptions(exception.InvalidParameterValue,
+                                   exception.NoFreeConductorWorker,
+                                   exception.NodeLocked)
+    def get_boot_device(self, context, names):
+        """RPC method to get the boot device of nodes.
+
+        :param context: an admin context.
+        :param names: the names of nodes.
+        :raises: NoFreeConductorWorker when there is no free worker to start
+                 async task.
+        :raises: InvalidParameterValue
+        :raises: MissingParameterValue
+
+        """
+        LOG.info("RPC get_boot_device called for nodes %(nodes)s. " %
+                 {'nodes': str(names)})
+
+        def _get_boot_device(node):
+            control_plugin = mapping.get_control_plugin(node)
+            control_plugin.validate(node)
+            return control_plugin.get_boot_device(node)
+
+        with task_manager.acquire(context, names,
+                                  purpose='get_boot_device') as task:
+            result = self._process_nodes_worker(_get_boot_device,
+                                                nodes=task.nodes)
+            return result
+
+    @messaging.expected_exceptions(exception.InvalidParameterValue,
+                                   exception.NoFreeConductorWorker,
+                                   exception.NodeLocked)
+    def set_boot_device(self, context, names, boot_device):
+        """RPC method to get the boot device of nodes.
+
+        :param context: an admin context.
+        :param names: the names of nodes.
+        :param boot_device: the boot device target.
+        :raises: NoFreeConductorWorker when there is no free worker to start
+                 async task.
+        :raises: InvalidParameterValue
+        :raises: MissingParameterValue
+
+        """
+        LOG.info(
+            "RPC set_boot_device boot_device called for nodes %(nodes)s. " % {
+                'nodes': str(names), 'boot_device': boot_device})
+
+        def _set_boot_device(node, boot_device):
+            control_plugin = mapping.get_control_plugin(node)
+            control_plugin.validate(node)
+            return control_plugin.set_boot_device(node, boot_device)
+
+        with task_manager.acquire(context, names,
+                                  purpose='set boot device') as task:
+            result = self._process_nodes_worker(_set_boot_device,
+                                                nodes=task.nodes,
+                                                boot_device=boot_device)
             return result

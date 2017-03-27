@@ -1,5 +1,5 @@
-# Copyright 2016 OpenStack Foundation
-# All Rights Reserved.
+# Copyright 2016 Intel Corporation
+# Copyright 2013 Hewlett-Packard Development Company, L.P.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -15,19 +15,17 @@
 
 from oslo_config import cfg
 
-from xcat3.conf import api
-from xcat3.conf import conductor
-from xcat3.conf import database
-from xcat3.conf import default
-from xcat3.conf import deploy
-from xcat3.conf import dhcp
+from xcat3.common.i18n import _
+
+opts = [
+    cfg.StrOpt('install_dir',
+               default='/var/lib/xcat3/install',
+               help=_('The install directory to place images')),
+    cfg.StrOpt('tftp_dir',
+               default='/var/lib/xcat3/tftpboot',
+               help=_('The tftp directory to place images'))
+]
 
 
-CONF = cfg.CONF
-
-api.register_opts(CONF)
-conductor.register_opts(CONF)
-database.register_opts(CONF)
-default.register_opts(CONF)
-deploy.register_opts(CONF)
-dhcp.register_opts(CONF)
+def register_opts(conf):
+    conf.register_opts(opts, group='deploy')

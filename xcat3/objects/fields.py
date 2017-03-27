@@ -93,7 +93,17 @@ class MACAddressField(object_fields.AutoTypedField):
     AUTO_TYPE = MACAddress()
 
 
-class IPAddress(object_fields.FieldType):
+
+class StringPattern(object_fields.FieldType):
+    def get_schema(self):
+        if hasattr(self, "PATTERN"):
+            return {'type': ['string'], 'pattern': self.PATTERN}
+        else:
+            msg = _("%s has no pattern") % self.__class__.__name__
+            raise AttributeError(msg)
+
+
+class IPAddress(StringPattern):
     @staticmethod
     def coerce(obj, attr, value):
         try:
@@ -107,3 +117,151 @@ class IPAddress(object_fields.FieldType):
     @staticmethod
     def to_primitive(obj, attr, value):
         return str(value)
+
+
+class IPV4Address(IPAddress):
+    @staticmethod
+    def coerce(obj, attr, value):
+        result = IPAddress.coerce(obj, attr, value)
+        if result.version != 4:
+            raise ValueError(_('Network "%(val)s" is not valid '
+                               'in field %(attr)s') %
+                             {'val': value, 'attr': attr})
+        return result
+
+    def get_schema(self):
+        return {'type': ['string'], 'format': 'ipv4'}
+
+
+class IPV6Address(IPAddress):
+    @staticmethod
+    def coerce(obj, attr, value):
+        result = IPAddress.coerce(obj, attr, value)
+        if result.version != 6:
+            raise ValueError(_('Network "%(val)s" is not valid '
+                               'in field %(attr)s') %
+                             {'val': value, 'attr': attr})
+        return result
+
+    def get_schema(self):
+        return {'type': ['string'], 'format': 'ipv6'}
+
+
+class IPV4AndV6Address(IPAddress):
+    @staticmethod
+    def coerce(obj, attr, value):
+        result = IPAddress.coerce(obj, attr, value)
+        if result.version != 4 and result.version != 6:
+            raise ValueError(_('Network "%(val)s" is not valid '
+                               'in field %(attr)s') %
+                             {'val': value, 'attr': attr})
+        return value
+
+    def get_schema(self):
+        return {'oneOf': [IPV4Address().get_schema(),
+                          IPV6Address().get_schema()]}
+
+
+class IPNetwork(IPAddress):
+    @staticmethod
+    def coerce(obj, attr, value):
+        try:
+            return netaddr.IPNetwork(value)
+        except netaddr.AddrFormatError as e:
+            raise ValueError(six.text_type(e))
+
+
+class IPV4Network(IPNetwork):
+
+    PATTERN = (r'^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-'
+               r'9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2]['
+               r'0-9]|3[0-2]))$')
+
+    @staticmethod
+    def coerce(obj, attr, value):
+        try:
+            return netaddr.IPNetwork(value, version=4)
+        except netaddr.AddrFormatError as e:
+            raise ValueError(six.text_type(e))
+
+
+class IPV6Network(IPNetwork):
+
+    def __init__(self, *args, **kwargs):
+        super(IPV6Network, self).__init__(*args, **kwargs)
+        self.PATTERN = self._create_pattern()
+
+    @staticmethod
+    def coerce(obj, attr, value):
+        try:
+            return netaddr.IPNetwork(value, version=6)
+        except netaddr.AddrFormatError as e:
+            raise ValueError(six.text_type(e))
+
+    def _create_pattern(self):
+        ipv6seg = '[0-9a-fA-F]{1,4}'
+        ipv4seg = '(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])'
+
+        return (
+            # Pattern based on answer to
+            # http://stackoverflow.com/questions/53497/regular-expression-that-matches-valid-ipv6-addresses
+            '^'
+            # 1:2:3:4:5:6:7:8
+            '(' + ipv6seg + ':){7,7}' + ipv6seg + '|'
+            # 1:: 1:2:3:4:5:6:7::
+            '(' + ipv6seg + ':){1,7}:|'
+            # 1::8 1:2:3:4:5:6::8 1:2:3:4:5:6::8
+            '(' + ipv6seg + ':){1,6}:' + ipv6seg + '|'
+            # 1::7:8 1:2:3:4:5::7:8 1:2:3:4:5::8
+            '(' + ipv6seg + ':){1,5}(:' + ipv6seg + '){1,2}|'
+            # 1::6:7:8 1:2:3:4::6:7:8 1:2:3:4::8
+            '(' + ipv6seg + ':){1,4}(:' + ipv6seg + '){1,3}|'
+            # 1::5:6:7:8 1:2:3::5:6:7:8 1:2:3::8
+            '(' + ipv6seg + ':){1,3}(:' + ipv6seg + '){1,4}|'
+            # 1::4:5:6:7:8 1:2::4:5:6:7:8 1:2::8
+            '(' + ipv6seg + ':){1,2}(:' + ipv6seg + '){1,5}|' +
+            # 1::3:4:5:6:7:8 1::3:4:5:6:7:8 1::8
+            ipv6seg + ':((:' + ipv6seg + '){1,6})|'
+            # ::2:3:4:5:6:7:8 ::2:3:4:5:6:7:8 ::8 ::
+            ':((:' + ipv6seg + '){1,7}|:)|'
+            # fe80::7:8%eth0 fe80::7:8%1
+            'fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|'
+            # ::255.255.255.255 ::ffff:255.255.255.255 ::ffff:0:255.255.255.255
+            '::(ffff(:0{1,4}){0,1}:){0,1}'
+            '(' + ipv4seg + '\.){3,3}' +
+            ipv4seg + '|'
+            # 2001:db8:3:4::192.0.2.33 64:ff9b::192.0.2.33
+            '(' + ipv6seg + ':){1,4}:'
+            '(' + ipv4seg + '\.){3,3}' +
+            ipv4seg +
+            # /128
+            '(\/(d|dd|1[0-1]d|12[0-8]))$'
+            )
+
+
+class IPAddressField(object_fields.AutoTypedField):
+    AUTO_TYPE = IPAddress()
+
+
+class IPV4AddressField(object_fields.AutoTypedField):
+    AUTO_TYPE = IPV4Address()
+
+
+class IPV6AddressField(object_fields.AutoTypedField):
+    AUTO_TYPE = IPV6Address()
+
+
+class IPV4AndV6AddressField(object_fields.AutoTypedField):
+    AUTO_TYPE = IPV4AndV6Address()
+
+
+class IPNetworkField(object_fields.AutoTypedField):
+    AUTO_TYPE = IPNetwork()
+
+
+class IPV4NetworkField(object_fields.AutoTypedField):
+    AUTO_TYPE = IPV4Network()
+
+
+class IPV6NetworkField(object_fields.AutoTypedField):
+    AUTO_TYPE = IPV6Network()

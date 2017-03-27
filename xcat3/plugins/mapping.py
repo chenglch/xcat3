@@ -1,21 +1,23 @@
 from oslo_log import log
 from xcat3.common import exception
 from xcat3.plugins.control import ipmi
-from xcat3.plugins.control import openbmc
+from xcat3.plugins.control import ssh
 
 LOG = log.getLogger(__name__)
 
-plugin_map = dict()
-plugin_map['ipmi'] = ipmi.IPMIPlugin()
-plugin_map['openbmc'] = openbmc.OPENBMCPlugin()
+control_map = dict()
+control_map['ipmi'] = ipmi.IPMIPlugin()
+control_map['kvm'] = ssh.SSHControl()
 
-def get_plugin(node):
-    control_plugin = plugin_map.get(node.mgt)
-    os_plugin = None
-    boot_plugin = None
+boot_map = dict()
+os_map = dict()
+
+
+def get_control_plugin(node):
+    control_plugin = control_map.get(node.mgt)
     if not control_plugin:
         raise exception.PluginNotFound(name=node.mgt)
-    return control_plugin, os_plugin, boot_plugin
+    return control_plugin
 
 
 

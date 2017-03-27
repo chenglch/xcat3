@@ -36,8 +36,10 @@ class Nics(base.XCAT3Object, object_base.VersionedObjectDictCompat):
     fields = {
         'id': object_fields.IntegerField(),
         'uuid': object_fields.UUIDField(nullable=True),
+        'name': object_fields.StringField(nullable=True),
         'node_id': object_fields.IntegerField(nullable=True),
         'mac': object_fields.MACAddressField(nullable=True),
+        'ip': object_fields.StringField(nullable=True),
         'extra': object_fields.FlexibleDictField(nullable=True),
     }
 

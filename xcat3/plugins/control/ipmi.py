@@ -2,8 +2,8 @@ from oslo_log import log
 from xcat3.plugins.control import base
 from xcat3.common import exception
 from xcat3.common.i18n import _, _LE, _LI, _LW
-
 from xcat3.common import states
+from xcat3.common import boot_device
 
 LOG = log.getLogger(__name__)
 
@@ -37,12 +37,29 @@ class IPMIPlugin(base.ControlInterface):
         :param power_state: Any power state.
         :raises: MissingParameterValue if a required parameter is missing.
         """
-        LOG.info("RPC change_power_state called for nodes %(node)s. "
+        LOG.info("RPC set power state called for nodes %(node)s. "
                  "The desired new state is %(target)s.",
                  {'node': node.name, 'target': power_state})
         # Node(chenglch): Just for test
         if node.name == 'node1':
             raise exception.InvalidName(name=node.name)
+
+    def get_boot_device(self, node):
+        """Return the boot device of the node
+
+        :param node: the node to act on.
+        :raises: MissingParameterValue if a required parameter is missing.
+        :returns: the boot device
+        """
+        return boot_device.NET
+
+    def set_boot_device(self, node, boot_device):
+        """Set the boot device of the node
+
+        :param node: the node to act on.
+        :raises: MissingParameterValue if a required parameter is missing.
+        """
+        pass
 
     def reboot(self, node):
         """Perform a hard reboot of the node's node.

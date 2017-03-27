@@ -26,6 +26,7 @@ from wsme import types as wtypes
 from xcat3.api.controllers import base
 from xcat3.api.controllers import link
 from xcat3.api.controllers.v1 import node
+from xcat3.api.controllers.v1 import network
 from xcat3.api.controllers.v1 import versions
 from xcat3.api import expose
 from xcat3.common.i18n import _
@@ -57,32 +58,11 @@ class V1(base.APIBase):
     id = wtypes.text
     """The ID of the version, also acts as the release number"""
 
-    media_types = [MediaType]
-    """An array of supported media types for this version"""
-
     links = [link.Link]
     """Links that point to a specific URL for this version and documentation"""
 
-    chassis = [link.Link]
-    """Links to the chassis resource"""
-
     nodes = [link.Link]
     """Links to the nodes resource"""
-
-    ports = [link.Link]
-    """Links to the ports resource"""
-
-    portgroups = [link.Link]
-    """Links to the portgroups resource"""
-
-    drivers = [link.Link]
-    """Links to the drivers resource"""
-
-    lookup = [link.Link]
-    """Links to the lookup resource"""
-
-    heartbeat = [link.Link]
-    """Links to the heartbeat resource"""
 
     @staticmethod
     def convert():
@@ -111,6 +91,7 @@ class Controller(rest.RestController):
     """Version 1 API controllers root."""
 
     nodes = node.NodesController()
+    network = network.NetworkController()
     @expose.expose(V1)
     def get(self):
         # NOTE: The reason why convert() it's being called for every

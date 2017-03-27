@@ -42,9 +42,11 @@ class Nic(base.APIBase):
     """
 
     uuid = types.uuid
-    """Unique UUID for this port"""
+    """Unique UUID for this nic"""
     mac = wsme.wsattr(types.macaddress, mandatory=True)
-    """MAC Address for this port"""
+    """MAC Address for this nic"""
+    name = wsme.wsattr(wtypes.text)
+    """name for this nic"""
     ip = wsme.wsattr(wtypes.text)
     netmask = wsme.wsattr(wtypes.text)
     extra = {wtypes.text: types.jsontype}

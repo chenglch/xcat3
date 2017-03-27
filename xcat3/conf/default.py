@@ -71,6 +71,10 @@ utils_opts = [
                sample_default='/tmp',
                help=_('Temporary working directory, default is Python temp '
                       'dir.')),
+    cfg.IntOpt('subprocess_checking_interval',
+               default=1,
+               help=_('Time interval (in seconds) for checking the status of '
+                      'subprocess.')),
 ]
 
 

@@ -1,0 +1,12 @@
+host {{node.name}} {
+  dynamic;
+  hardware ethernet {{node.mac}};
+  fixed-address {{node.ip_address}};
+        supersede server.ddns-hostname = "{{node.name}}";
+        supersede host-name = "{{node.name}}";
+        if option vendor-class-identifier = "ScaleMP" {
+          supersede server.filename = "vsmp/pxelinux.0";
+        } else {
+          supersede server.filename = "pxelinux.0";
+        }
+}

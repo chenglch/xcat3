@@ -28,7 +28,7 @@ class ControlInterface(base.BaseInterface):
         """Set the power state of the node's node.
 
         :param node: the node to act on.
-        :param power_state: Any power state from :mod:`ironic.common.states`.
+        :param power_state: Any power state from :mod:`xcat3.common.states`.
         :raises: MissingParameterValue if a required parameter is missing.
         """
 
@@ -40,6 +40,23 @@ class ControlInterface(base.BaseInterface):
         by powering it on.
 
         :param node: the node to act on.
+        :raises: MissingParameterValue if a required parameter is missing.
+        """
+
+    @abc.abstractmethod
+    def get_boot_device(self, node):
+        """get the boot device of node.
+
+        :param node: the node to act on.
+        :raises: MissingParameterValue if a required parameter is missing.
+        """
+
+    @abc.abstractmethod
+    def set_boot_device(self, node, boot_device):
+        """set the boot device of node.
+
+        :param node: the node to act on.
+        :param boot_device: the boot device target to set.
         :raises: MissingParameterValue if a required parameter is missing.
         """
 

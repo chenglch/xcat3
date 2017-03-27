@@ -181,6 +181,10 @@ class NodeNotFound(NotFound):
     _msg_fmt = _("Node %(node)s could not be found")
 
 
+class NetworkNotFound(NotFound):
+    _msg_fmt = _("Network %(net)s could not be found")
+
+
 class NoValidHost(NotFound):
     _msg_fmt = _("No valid host was found. Reason: %(reason)s")
 
@@ -208,6 +212,10 @@ class MACAlreadyExists(Conflict):
 
 class NicAlreadyExists(Conflict):
     _msg_fmt = _("A nic with UUID %(uuid)s already exists.")
+
+
+class NetworkAlreadyExists(Conflict):
+    _msg_fmt = _("A network with name %(name)s already exists.")
 
 
 class NotAuthorized(XCAT3Exception):
@@ -280,6 +288,30 @@ class NicNotFound(NotFound):
 
 class PluginNotFound(NotFound):
     _msg_fmt = _("plugin for %(name)s could not been loaded.")
+
+
+class InvalidFile(Invalid):
+    _msg_fmt = _("Can not access file %(name)s.")
+
+
+class DHCPProcessError(XCAT3Exception):
+    _msg_fmt = "%(err)s"
+
+
+class SSHConnectFailed(XCAT3Exception):
+    _msg_fmt = _("Failed to establish SSH connection to host %(host)s.")
+
+
+class SSHCommandFailed(XCAT3Exception):
+    _msg_fmt = _("Failed to execute command via SSH: %(cmd)s.")
+
+
+class InvalidState(Conflict):
+    _msg_fmt = _("Invalid resource state.")
+
+
+class PowerStateFailure(InvalidState):
+    _msg_fmt = _("Failed to set node power state to %(pstate)s.")
 
 
 class ExceptionFromRestRsp(XCAT3Exception):

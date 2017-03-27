@@ -1,0 +1,33 @@
+shared-network {{network.nic}} {
+  subnet {{network.subnet}} netmask {{network.netmask}} {
+    authoritative;
+    max-lease-time 43200;
+    min-lease-time 43200;
+    default-lease-time 43200;
+    option routers  {{network.router}};
+    next-server  {{network.nextserver}};
+
+    if option user-class-identifier = "xNBA" and option client-architecture = 00:00 { #x86, xCAT Network Boot Agent
+       always-broadcast on;
+       filename = "http://{{network.conductor}}/tftpboot/xcat/xnba/nets/10.0.0.0_8";
+    } else if option user-class-identifier = "xNBA" and option client-architecture = 00:09 { #x86, xCAT Network Boot Agent
+       filename = "http://{{network.conductor}}/tftpboot/xcat/xnba/nets/10.0.0.0_8.uefi";
+    } else if option client-architecture = 00:00  { #x86
+      filename "xcat/xnba.kpxe";
+    } else if option vendor-class-identifier = "Etherboot-5.4"  { #x86
+      filename "xcat/xnba.kpxe";
+    } else if option client-architecture = 00:07 { #x86_64 uefi
+       filename "xcat/xnba.efi";
+    } else if option client-architecture = 00:09 { #x86_64 uefi alternative id
+       filename "xcat/xnba.efi";
+    } else if option client-architecture = 00:02 { #ia64
+       filename "elilo.efi";
+    } else if option client-architecture = 00:0e { #OPAL-v3
+       option conf-file = "http://{{network.conductor}}/tftpboot/pxelinux.cfg/p/{{network.subnet}}_{{network.netbits}}";
+    } else if substring (option vendor-class-identifier,0,11) = "onie_vendor" { #for onie on cumulus switch
+      option www-server = "http://{{network.conductor}}/install/onie/onie-installer";
+    } else if substring(filename,0,1) = null { #otherwise, provide yaboot if the client isn't specific
+       filename "/yaboot";
+    }
+  } # {{network.subnet}}/{{network.netmask}} subnet_end
+} # {{network.nic}} nic_end

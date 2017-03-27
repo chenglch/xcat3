@@ -28,7 +28,7 @@ Pre-install steps
 
   apt-get update && apt-get install build-essential python-dev libssl-dev \
   python-pip libmysqlclient-dev libxml2-dev libxslt-dev libpq-dev libffi-dev \
-  gettext git rabbitmq-server mysql-server jq
+  gettext git rabbitmq-server mysql-server jq isc-dhcp-server
 
 Installation
 ============

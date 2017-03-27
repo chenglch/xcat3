@@ -41,7 +41,7 @@ _DEFAULT_RETURN_FIELDS = ('name', 'reservation', 'created_at', 'nics_info',
                           'state', 'task_action', 'type', 'arch', 'mgt',
                           'updated_at')
 
-_REST_RESOURCE = ('power')
+_REST_RESOURCE = ('power', 'provision', 'boot_device')
 
 ALLOWED_TARGET_POWER_STATES = (xcat3_states.POWER_ON,
                                xcat3_states.POWER_OFF,
@@ -97,7 +97,8 @@ def _wait_rpc_result(futures, names):
                     result['nodes'][node] = r.exception().message
             else:
                 result['error'] = r.exception().message
-            result['errorcode'] = r.exception().code
+            if hasattr(r.exception(), 'code'):
+                result['errorcode'] = r.exception().code
         else:
             # Manager should return a dict result
             for k, v in r.result().items():
@@ -112,7 +113,7 @@ class Node(base.APIBase):
     This class enforces type checking and value constraints, and converts
     between the internal object model and the API representation of a node.
     """
-    name = wsme.wsattr(wtypes.text)
+    name = wsme.wsattr(wtypes.text, mandatory=True)
     """The logical name for this node"""
     reservation = wsme.wsattr(wtypes.text, readonly=True)
     """The hostname of the conductor that holds an exclusive lock on
@@ -214,37 +215,66 @@ class NodeCollection(collection.Collection):
         return sample
 
 
-class NodeStates(base.APIBase):
-    """API representation of the states of a node."""
+class NodeProvisionController(rest.RestController):
 
-    power_state = wtypes.text
-    """Represent the current (not transition) power state of the node"""
+    @expose.expose(types.jsontype, wtypes.text,
+                   wtypes.text,
+                   body=NodeCollection,
+                   status_code=http_client.ACCEPTED)
+    def put(self, target, nodes):
+        """Set the provision state of the nodes.
 
-    task_action = wtypes.text
-    """Represent the current (not transition) task action of the node"""
+        :param target: The desired  state of the node.
+        :param nodes: the name of nodes.
+        :raises: ClientSideError (HTTP 409) if a provision operation is
+                 already in progress.
+        :raises: InvalidStateRequested (HTTP 400) if the requested target
+                 state is not valid or if the node is in CLEANING state.
+        :raises: NotAcceptable (HTTP 406) the target state is not supported.
+        :raises: Invalid (HTTP 400) if timeout value is less than 1.
 
-    state = wtypes.text
-    """Represent the current (not transition) state of the node"""
+        """
+        names = [node.name for node in nodes.nodes if node.name]
+        futures = pecan.request.rpcapi.provision(pecan.request.context, names,
+                                                 target=target)
+        result = _wait_rpc_result(futures, names)
+        url_args = '/'.join('states')
+        pecan.response.location = link.build_url('nodes', url_args)
+        # result = pecan.request.dhcp_api.provision(pecan.request.context, names,
+        #                                           target=target)
+        return result
 
-    last_error = wtypes.text
-    """Any error from the most recent (last) asynchronous transaction that
-    started but failed to finish."""
 
-    @staticmethod
-    def convert(node_obj):
-        attr_list = ['last_error', 'power_state', 'task_action']
-        states = NodeStates()
-        for attr in attr_list:
-            setattr(states, attr, getattr(node_obj, attr))
-        return states
+class BootDeviceController(rest.RestController):
+    @expose.expose(types.jsontype, wtypes.text, body=NodeCollection,
+                   status_code=http_client.ACCEPTED)
+    def put(self, target, nodes):
+        """Set the boot device for nodes.
 
-    @classmethod
-    def sample(cls):
-        sample = cls(last_error=None,
-                     action=None,
-                     power_state=xcat3_states.POWER_ON,
-                     state=None)
-        return sample
+        Set the boot device to use on next reboot of the nodes.
+
+        :param nodes: list of nodes
+        :param boot_device: the boot device.
+        :returns: json format about the status of nodes
+        """
+        names = [node.name for node in nodes.nodes if node.name]
+        futures = pecan.request.rpcapi.set_boot_device(
+            pecan.request.context, names, target)
+        result = _wait_rpc_result(futures, names)
+        return result
+
+    @expose.expose(types.jsontype, body=NodeCollection)
+    def get(self, nodes):
+        """Get the current boot device for a node.
+
+        :param nodes: list of node to check
+        :returns: json format about the status of nodes
+        """
+        names = [node.name for node in nodes.nodes if node.name]
+        futures = pecan.request.rpcapi.get_boot_device(
+            pecan.request.context, names)
+        result = _wait_rpc_result(futures, names)
+        return result
 
 
 class NodePowerController(rest.RestController):
@@ -269,7 +299,7 @@ class NodePowerController(rest.RestController):
         """Set the power state of the node.
 
         :param target: The desired power state of the node.
-        :param nodes: the UUID or logical name of nodes.
+        :param nodes: the name of nodes.
         :raises: ClientSideError (HTTP 409) if a power operation is
                  already in progress.
         :raises: InvalidStateRequested (HTTP 400) if the requested target
@@ -295,6 +325,8 @@ class NodePowerController(rest.RestController):
 
 class NodesController(rest.RestController):
     power = NodePowerController()
+    provision = NodeProvisionController()
+    boot_device = BootDeviceController()
     invalid_sort_key_list = ['name']
 
     def _check_names_acceptable(self, names, error_msg):
@@ -305,12 +337,8 @@ class NodesController(rest.RestController):
         :param names: list of node names to check
         :param error_msg: error message in case of wsme.exc.ClientSideError,
             should contain %(name)s placeholder.
-        :raises: exception.NotAcceptable
         :raises: wsme.exc.ClientSideError
         """
-        if not api_utils.allow_node_logical_names():
-            raise exception.NotAcceptable()
-
         for name in names:
             if not api_utils.is_valid_node_name(name):
                 raise wsme.exc.ClientSideError(

@@ -63,11 +63,13 @@ class Conductor(Base):
 
     __tablename__ = 'conductors'
     __table_args__ = (
-        schema.UniqueConstraint('hostname', name='uniq_conductors0hostname'),
+        schema.UniqueConstraint('hostname', 'service',
+                                name='uniq_conductors0hostname'),
         table_args()
     )
     id = Column(Integer, primary_key=True)
     hostname = Column(String(255), nullable=False)
+    service = Column(String(255), default='conductor')
     online = Column(Boolean, default=True)
 
 
@@ -106,6 +108,7 @@ class Nics(Base):
         table_args())
     id = Column(Integer, primary_key=True)
     uuid = Column(String(36))
+    name = Column(String(18))
     mac = Column(String(18), nullable=True)
     ip = Column(String(36), nullable=True)
     netmask = Column(String(36), nullable=True)
@@ -124,13 +127,13 @@ class Networks(Base):
         table_args())
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=True)
-    network = Column(String(36), nullable=True)
+    subnet = Column(String(36), nullable=True)
     netmask = Column(String(36), nullable=True)
     gateway = Column(String(36), nullable=True)
     dhcpserver = Column(String(255), nullable=True)
     nameservers = Column(String(255), nullable=True)
     ntpservers = Column(String(255), nullable=True)
-    dynamicrange = Column(String(255), nullable=True)
+    dynamic_range = Column(String(255), nullable=True)
     extra = Column(db_types.JsonEncodedDict, nullable=True)
 
 

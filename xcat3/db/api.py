@@ -240,8 +240,37 @@ class Connection(object):
         """destroy nic"""
 
     @abc.abstractmethod
-    def get_conductors(self):
+    def get_network_by_id(self, id):
+        """Get network from network id"""
+
+    @abc.abstractmethod
+    def get_network_by_name(self, name):
+        """Get network from network name"""
+
+    @abc.abstractmethod
+    def get_network_list(self, filters=None, limit=None, sort_key=None,
+                         sort_dir=None):
+        """Get network list from networks table"""
+
+    @abc.abstractmethod
+    def create_network(self, values):
+        """Create network in networks table"""
+
+    @abc.abstractmethod
+    def destroy_network(self, name):
+        """Destroy network"""
+
+    @abc.abstractmethod
+    def update_network(self, network_id, values):
+        """Update network"""
+
+    @abc.abstractmethod
+    def get_conductors(self, service='conductor'):
         """Return conductor nodes
 
         :returns: Conductor nodes
         """
+
+    @abc.abstractmethod
+    def register_conductor(self, values, update_existing=False):
+        """Register conductor nodes"""

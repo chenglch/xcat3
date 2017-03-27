@@ -137,6 +137,8 @@ class Connection(api.Connection):
                         nics = models.Nics()
                         nic['node_id'] = node.id
                         nic['uuid'] = uuidutils.generate_uuid()
+                        if nic.get('primary') is not None:
+                            nic['extra'] = {'primary': True}
                         nics.update(nic)
                         session.add(nics)
                         session.flush()
@@ -369,16 +371,70 @@ class Connection(api.Connection):
             if count == 0:
                 raise exception.NicNotFound(nic=nic_id)
 
-    def get_conductors(self):
+    def get_network_by_id(self, id):
+        query = model_query(models.Networks)
+        query = query.filter_by(id=id)
+        try:
+            return query.one()
+        except NoResultFound:
+            raise exception.NetworkNotFound(net=id)
+
+    def get_network_by_name(self, name):
+        query = model_query(models.Networks)
+        query = query.filter_by(name=name)
+        try:
+            return query.one()
+        except NoResultFound:
+            raise exception.NetworkNotFound(net=name)
+
+    def get_network_list(self, filters=None, limit=None, sort_key=None,
+                      sort_dir=None):
+        query = model_query(models.Networks)
+        return _paginate_query(models.Networks, limit, sort_key, sort_dir, query)
+
+    def create_network(self, values):
+        network = models.Networks()
+        network.update(values)
+        with _session_for_write() as session:
+            try:
+                session.add(network)
+                session.flush()
+            except db_exc.DBDuplicateEntry as exc:
+                raise exception.NetworkAlreadyExists(name=values['name'])
+            return network
+
+    def destroy_network(self, name):
+        with _session_for_write():
+            query = model_query(models.Networks)
+            query = query.filter_by(name=name)
+
+            try:
+                network = query.one()
+            except NoResultFound:
+                raise exception.NetworkNotFound(net=name)
+            query.delete()
+
+    def update_network(self, network_id, values):
+        try:
+            return self._do_update_network(network_id, values)
+        except db_exc.DBDuplicateEntry as e:
+            if 'name' in e.columns:
+                raise exception.DuplicateName(net=values['name'])
+            else:
+                raise
+
+    def get_conductors(self, service='conductor'):
         interval = CONF.conductor.heartbeat_timeout
         limit = timeutils.utcnow() - datetime.timedelta(seconds=interval)
         return (model_query(models.Conductor).filter(
-            models.Conductor.updated_at > limit).all())
+            models.Conductor.updated_at > limit,
+            models.Conductor.service == service).all())
 
     def register_conductor(self, values, update_existing=False):
         with _session_for_write() as session:
             query = (model_query(models.Conductor)
-                     .filter_by(hostname=values['hostname']))
+                     .filter_by(hostname=values['hostname'],
+                                service=values['service']))
             try:
                 ref = query.one()
                 if ref.online is True and not update_existing:
@@ -394,26 +450,27 @@ class Connection(api.Connection):
                         'online': True})
         return ref
 
-    def get_conductor(self, hostname):
+    def get_conductor(self, hostname, service='conductor'):
         try:
             return (model_query(models.Conductor)
-                    .filter_by(hostname=hostname, online=True)
+                    .filter_by(hostname=hostname, online=True, service=service)
                     .one())
         except NoResultFound:
             raise exception.ConductorNotFound(conductor=hostname)
 
-    def unregister_conductor(self, hostname):
+    def unregister_conductor(self, hostname, service='conductor'):
         with _session_for_write():
             query = (model_query(models.Conductor)
-                     .filter_by(hostname=hostname, online=True))
+                     .filter_by(hostname=hostname, online=True,
+                                service='conductor'))
             count = query.update({'online': False})
             if count == 0:
                 raise exception.ConductorNotFound(conductor=hostname)
 
-    def touch_conductor(self, hostname):
+    def touch_conductor(self, hostname, service='conductor'):
         with _session_for_write():
             query = (model_query(models.Conductor)
-                     .filter_by(hostname=hostname))
+                     .filter_by(hostname=hostname, service=service))
             # since we're not changing any other field, manually set updated_at
             # and since we're heartbeating, make sure that online=True
             count = query.update({'updated_at': timeutils.utcnow(),
@@ -438,6 +495,18 @@ class Connection(api.Connection):
                 ref = query.with_lockmode('update').one()
             except NoResultFound:
                 raise exception.NodeNotFound(node=node_id)
+
+            ref.update(values)
+        return ref
+
+    def _do_update_network(self, network_id, values):
+        with _session_for_write():
+            query = model_query(models.Networks)
+            query = add_identity_filter(query, network_id)
+            try:
+                ref = query.with_lockmode('update').one()
+            except NoResultFound:
+                raise exception.ConductorNotExist(net=network_id)
 
             ref.update(values)
         return ref

@@ -196,3 +196,84 @@ class ConductorAPI(object):
             futures.append(future)
 
         return futures
+
+    def provision(self, context, names, target):
+        """Change nodes's provision state.
+
+        Synchronously, acquire lock and start the conductor background task
+        to change power state of a node.
+
+        :param context: request context.
+        :param names: names of nodes.
+        :param target: desired power state
+        :raises: NoFreeConductorWorker when there is no free worker to start
+                 async task.
+
+        """
+
+        def _provision(cctxt, names, target):
+            return cctxt.call(context, 'provision', names=names,
+                              target=target)
+
+        topic_dict = self.get_topic_for(names)
+        futures = []
+        for topic, nodes in topic_dict.items():
+            cctxt = self.client.prepare(topic=topic or self.topic,
+                                        version='1.0')
+            future = self.spawn_worker(_provision, cctxt, names=nodes,
+                                       target=target)
+            futures.append(future)
+
+        return futures
+
+    def get_boot_device(self, context, names):
+        """Get a node's boot device
+
+        Synchronously, acquire lock and start the conductor background task
+        to get the boot device of nodes.
+
+        :param context: request context.
+        :param names: names of nodes.
+        :raises: NoFreeConductorWorker when there is no free worker to start
+                 async task.
+        """
+
+        def _get_boot_device(cctxt, names):
+            return cctxt.call(context, 'get_boot_device', names=names)
+
+        topic_dict = self.get_topic_for(names)
+        futures = []
+        for topic, nodes in topic_dict.items():
+            cctxt = self.client.prepare(topic=topic or self.topic,
+                                        version='1.0')
+            future = self.spawn_worker(_get_boot_device, cctxt, names=nodes)
+            futures.append(future)
+
+        return futures
+
+    def set_boot_device(self, context, names, boot_device):
+        """Get a node's boot device
+
+        Synchronously, acquire lock and start the conductor background task
+        to set the boot device of nodes.
+
+        :param context: request context.
+        :param names: names of nodes.
+        :raises: NoFreeConductorWorker when there is no free worker to start
+                 async task.
+        """
+
+        def _set_boot_device(cctxt, names, boot_device):
+            return cctxt.call(context, 'set_boot_device', names=names,
+                              boot_device=boot_device)
+
+        topic_dict = self.get_topic_for(names)
+        futures = []
+        for topic, nodes in topic_dict.items():
+            cctxt = self.client.prepare(topic=topic or self.topic,
+                                        version='1.0')
+            future = self.spawn_worker(_set_boot_device, cctxt, names=nodes,
+                                       boot_device=boot_device)
+            futures.append(future)
+
+        return futures

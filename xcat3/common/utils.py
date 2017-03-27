@@ -23,6 +23,7 @@ import datetime
 import errno
 import jinja2
 import os
+import paramiko
 import pytz
 import re
 import shutil
@@ -38,9 +39,11 @@ from xcat3.conf import CONF
 from xcat3.common import exception
 from xcat3.common.i18n import _, _LE, _LW
 
+
 LOG = logging.getLogger(__name__)
 
 warn_deprecated_extra_vif_port_id = False
+DEVNULL = open(os.devnull, 'r+')
 
 
 def _get_root_helper():
@@ -77,6 +80,44 @@ def execute(*cmd, **kwargs):
     return result
 
 
+def ssh_connect(connection):
+    """Method to connect to a remote system using ssh protocol.
+
+    :param connection: a dict of connection parameters.
+    :returns: paramiko.SSHClient -- an active ssh connection.
+    :raises: SSHConnectFailed
+
+    """
+    try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        key_contents = connection.get('key_contents')
+        if key_contents:
+            data = six.StringIO(key_contents)
+            if "BEGIN RSA PRIVATE" in key_contents:
+                pkey = paramiko.RSAKey.from_private_key(data)
+            elif "BEGIN DSA PRIVATE" in key_contents:
+                pkey = paramiko.DSSKey.from_private_key(data)
+            else:
+                # Can't include the key contents - secure material.
+                raise ValueError(_("Invalid private key"))
+        else:
+            pkey = None
+        ssh.connect(connection.get('host'),
+                    username=connection.get('username'),
+                    password=connection.get('password'),
+                    port=connection.get('port', 22),
+                    pkey=pkey,
+                    key_filename=connection.get('key_filename'),
+                    timeout=connection.get('timeout', 10))
+
+        # send TCP keepalive packets every 20 seconds
+        ssh.get_transport().set_keepalive(20)
+    except Exception as e:
+        LOG.debug("SSH connect failed: %s", e)
+        raise exception.SSHConnectFailed(host=connection.get('host'))
+
+    return ssh
 
 
 def is_valid_datapath_id(datapath_id):
@@ -295,10 +336,6 @@ def umount(loc, *args):
     execute(*args, run_as_root=True, check_exit_code=[0])
 
 
-
-
-
-
 def is_regex_string_in_file(path, string):
     with open(path, 'r') as inf:
         return any(re.search(string, line) for line in inf.readlines())
@@ -341,3 +378,33 @@ def warn_about_deprecated_extra_vif_port_id():
                         "extra['vif_port_id'] is deprecated and will not "
                         "be supported in Pike release. API endpoint "
                         "v1/nodes/<node>/vifs should be used instead."))
+
+def normalize_mac(mac):
+    """Remove '-' and ':' characters and lowercase the MAC string.
+
+    :param mac: MAC address to normalize.
+    :return: Normalized MAC address string.
+    """
+    return mac.replace('-', '').replace(':', '').lower()
+
+
+def validate_network_port(port, port_name="Port"):
+    """Validates the given port.
+
+    :param port: TCP/UDP port.
+    :param port_name: Name of the port.
+    :returns: An integer port number.
+    :raises: InvalidParameterValue, if the port is invalid.
+    """
+    try:
+        port = int(port)
+    except ValueError:
+        raise exception.InvalidParameterValue(_(
+            '%(port_name)s "%(port)s" is not a valid integer.') %
+            {'port_name': port_name, 'port': port})
+    if port < 1 or port > 65535:
+        raise exception.InvalidParameterValue(_(
+            '%(port_name)s "%(port)s" is out of range. Valid port '
+            'numbers must be between 1 and 65535.') %
+            {'port_name': port_name, 'port': port})
+    return port

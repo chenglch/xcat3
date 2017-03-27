@@ -1,0 +1,24 @@
+option conf-file code 209 = text;
+option space isan;
+option isan-encap-opts code 43 = encapsulate isan;
+option isan.iqn code 203 = string;
+option isan.root-path code 201 = string;
+option space gpxe;
+option gpxe-encap-opts code 175 = encapsulate gpxe;
+option gpxe.bus-id code 177 = string;
+option user-class-identifier code 77 = string;
+option gpxe.no-pxedhcp code 176 = unsigned integer 8;
+option tcode code 101 = text;
+option iscsi-initiator-iqn code 203 = string;
+ddns-update-style interim;
+ignore client-updates;
+option client-architecture code 93 = unsigned integer 16;
+option tcode "US/Eastern";
+option gpxe.no-pxedhcp 1;
+option www-server code 114 = string;
+
+class "pxe" {
+   match if substring (option vendor-class-identifier, 0, 9) = "PXEClient";
+   ddns-updates off;
+    max-lease-time 600;
+}

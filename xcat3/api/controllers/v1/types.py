@@ -29,6 +29,11 @@ from xcat3.common import exception
 from xcat3.common.i18n import _
 from xcat3.common import utils
 
+try:
+    import ipaddress
+except ImportError:
+    import ipaddr as ipaddress
+
 
 class MacAddressType(wtypes.UserType):
     """A simple MAC address type."""
@@ -125,6 +130,63 @@ class BooleanType(wtypes.UserType):
         return BooleanType.validate(value)
 
 
+class IPv4AddressType(wtypes.UserType):
+    """
+    A simple IPv4 type.
+    """
+    basetype = six.string_types
+    name = "ipv4address"
+
+    @staticmethod
+    def validate(value):
+        try:
+            ipaddress.IPv4Address(value)
+        except ipaddress.AddressValueError:
+            error = 'Value should be IPv4 format'
+            raise ValueError(error)
+        return value
+
+
+class IPv6AddressType(wtypes.UserType):
+    """
+    A simple IPv6 type.
+    """
+    basetype = six.string_types
+    name = "ipv6address"
+
+    @staticmethod
+    def validate(value):
+        try:
+            ipaddress.IPv6Address(value)
+        except ipaddress.AddressValueError:
+            error = 'Value should be IPv6 format'
+            raise ValueError(error)
+        return value
+
+
+class IPAddressType(wtypes.UserType):
+    """A simple ipv4 or ipv6 name type."""
+
+    basetype = wtypes.text
+    name = 'ipv4_ipv6'
+
+    @staticmethod
+    def validate(value):
+        is_ipv6 = True
+        try:
+            ipaddress.IPv6Address(value)
+        except ipaddress.AddressValueError:
+            is_ipv6 = False
+
+        if not is_ipv6:
+            try:
+                ipaddress.IPv4Address(value)
+            except ipaddress.AddressValueError:
+                error = 'Value should be IP format'
+                raise ValueError(error)
+        return value
+
+
 class JsonType(wtypes.UserType):
     """A simple JSON type."""
 
@@ -183,6 +245,9 @@ boolean = BooleanType()
 listtype = ListType()
 # Can't call it 'json' because that's the name of the stdlib module
 jsontype = JsonType()
+ipv4type = IPv4AddressType()
+ipv6type = IPv6AddressType()
+iptype = IPAddressType()
 
 
 class JsonPatchType(wtypes.Base):

@@ -27,11 +27,9 @@ from xcat3.common.i18n import _, _LC, _LE, _LI, _LW
 from xcat3.common import rpc
 from xcat3.conf import CONF
 from xcat3.db import api as dbapi
-from xcat3.dhcp import rpcapi as dhcp_api
 from xcat3 import objects
 
 LOG = log.getLogger(__name__)
-
 
 class BaseConductorManager(object):
     def __init__(self, host, topic):
@@ -40,20 +38,18 @@ class BaseConductorManager(object):
             host = CONF.host
         self.host = host
         self.topic = topic
-        self.sensors_notifier = rpc.get_sensors_notifier()
         self._started = False
-        self.service = 'conductor'
-        self.dhcp_api = dhcp_api.ConductorAPI()
+        self.service = 'dhcp'
 
     def init_host(self, admin_context=None):
-        """Initialize the conductor host.
+        """Initialize the dhcp host.
 
         :param admin_context: the admin context to pass to periodic tasks.
-        :raises: RuntimeError when conductor is already running.
+        :raises: RuntimeError when dhcp conductor is already running.
         """
         if self._started:
             raise RuntimeError(_('Attempt to start an already running '
-                                 'conductor manager'))
+                                 'dhcp manager'))
 
         self.dbapi = dbapi.get_instance()
 
@@ -62,20 +58,20 @@ class BaseConductorManager(object):
 
         # TODO(dtantsur): make the threshold configurable?
         rejection_func = rejection.reject_when_reached(
-            CONF.conductor.workers_pool_size)
+            CONF.dhcp.workers_pool_size)
         self._executor = futurist.GreenThreadPoolExecutor(
-            max_workers=CONF.conductor.workers_pool_size,
+            max_workers=CONF.dhcp.workers_pool_size,
             check_and_reject=rejection_func)
 
         self._periodic_task_callables = []
         self._collect_periodic_tasks(self, (admin_context,))
         if (len(self._periodic_task_callables) >
-                CONF.conductor.workers_pool_size):
-            LOG.warning(_LW('This conductor has %(tasks)d periodic tasks '
+                CONF.dhcp.workers_pool_size):
+            LOG.warning(_LW('This dhcp service has %(tasks)d periodic tasks '
                             'enabled, but only %(workers)d task workers '
                             'allowed by [conductor]workers_pool_size option'),
                         {'tasks': len(self._periodic_task_callables),
-                         'workers': CONF.conductor.workers_pool_size})
+                         'workers': CONF.dhcp.workers_pool_size})
 
         self._periodic_tasks = periodics.PeriodicWorker(
             self._periodic_task_callables,
@@ -89,23 +85,21 @@ class BaseConductorManager(object):
         try:
             # Register this conductor with the cluster
             self.conductor = objects.Conductor.register(
-                admin_context, self.host, self.service)
+                admin_context, self.host, service=self.service)
         except exception.ConductorAlreadyRegistered:
             # This conductor was already registered and did not shut down
             # properly, so log a warning and update the record.
             LOG.warning(
-                _LW(
-                    "A conductor with hostname %(hostname)s service %(service)s"
-                    "was previously registered. Updating registration"),
+                _LW("A conductor with hostname %(hostname)s service %(service)s was previously registered. Updating registration"),
                 {'hostname': self.host, 'service': self.service})
             self.conductor = objects.Conductor.register(
-                admin_context, self.host, update_existing=True)
+                admin_context, self.host, self.service, update_existing=True)
 
         # Spawn a dedicated greenthread for the keepalive
         try:
             self._spawn_worker(self._conductor_service_record_keepalive)
             LOG.info(_LI('Successfully started conductor with hostname '
-                         '%(hostname)s service %(service)s.'),
+                         '%(hostname)s service %(service)s'),
                      {'hostname': self.host, 'service': self.service})
         except exception.NoFreeConductorWorker:
             with excutils.save_and_reraise_exception():
@@ -189,4 +183,4 @@ class BaseConductorManager(object):
             except db_exception.DBConnectionError:
                 LOG.warning(_LW('Conductor could not connect to database '
                                 'while heartbeating.'))
-            self._keepalive_evt.wait(CONF.conductor.heartbeat_interval)
+            self._keepalive_evt.wait(CONF.dhcp.heartbeat_interval)
