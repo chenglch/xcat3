@@ -280,3 +280,7 @@ class NicNotFound(NotFound):
 
 class PluginNotFound(NotFound):
     _msg_fmt = _("plugin for %(name)s could not been loaded.")
+
+
+class ExceptionFromRestRsp(XCAT3Exception):
+    _msg_fmt = _("%(exception)s.")
