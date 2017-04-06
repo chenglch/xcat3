@@ -312,7 +312,3 @@ class InvalidState(Conflict):
 
 class PowerStateFailure(InvalidState):
     _msg_fmt = _("Failed to set node power state to %(pstate)s.")
-
-
-class ExceptionFromRestRsp(XCAT3Exception):
-    _msg_fmt = _("%(exception)s.")

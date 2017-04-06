@@ -29,6 +29,7 @@ import re
 import shutil
 import six
 import tempfile
+import time
 
 from oslo_concurrency import processutils
 from oslo_log import log as logging
@@ -408,3 +409,22 @@ def validate_network_port(port, port_name="Port"):
             'numbers must be between 1 and 65535.') %
             {'port_name': port_name, 'port': port})
     return port
+
+@contextlib.contextmanager
+def record_time(times, enabled, *args):
+    """Record the time of a specific action.
+
+    :param times: A list of tuples holds time data.
+    :type times: list
+    :param enabled: Whether timing is enabled.
+    :type enabled: bool
+    :param *args: Other data to be stored besides time data, these args
+                  will be joined to a string.
+    """
+    if not enabled:
+        yield
+    else:
+        start = time.time()
+        yield
+        end = time.time()
+        times.append((' '.join(args), start, end))
