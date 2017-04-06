@@ -488,16 +488,32 @@ class Connection(api.Connection):
                 raise
 
     def _do_update_node(self, node_id, values):
-        with _session_for_write():
+        with _session_for_write() as session:
             query = model_query(models.Node)
             query = add_identity_filter(query, node_id)
             try:
-                ref = query.with_lockmode('update').one()
+                node = query.with_lockmode('update').one()
             except NoResultFound:
                 raise exception.NodeNotFound(node=node_id)
 
-            ref.update(values)
-        return ref
+            node.update(values)
+            nics_info = values.get('nics_info')
+            if nics_info:
+                session.refresh(node)
+                nics = self.get_nics_by_node_id(node.id)
+                for nic in nics:
+                    self.destroy_nic(nic.id)
+
+                for nic in nics_info['nics']:
+                    nics = models.Nics()
+                    nic['node_id'] = node.id
+                    nic['uuid'] = uuidutils.generate_uuid()
+                    if nic.get('primary') is not None:
+                        nic['extra'] = {'primary': True}
+                    nics.update(nic)
+                    session.add(nics)
+                    session.flush()
+        return node
 
     def _do_update_network(self, network_id, values):
         with _session_for_write():
