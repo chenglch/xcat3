@@ -135,7 +135,7 @@ def require_exclusive_lock(f):
     return wrapper
 
 
-def acquire(context, node_names, shared=False, driver_name=None,
+def acquire(context, node_names, shared=False, obj_info=None,
             purpose='unspecified action'):
     """Shortcut for acquiring a lock on a Node.
 
@@ -149,7 +149,8 @@ def acquire(context, node_names, shared=False, driver_name=None,
     """
     # NOTE(lintan): This is a workaround to set the context of periodic tasks.
     context.ensure_thread_contain_context()
-    return TaskManager(context, node_names, shared=shared, purpose=purpose)
+    return TaskManager(context, node_names, shared=shared, obj_info=obj_info,
+                       purpose=purpose)
 
 
 class TaskManager(object):
@@ -160,7 +161,7 @@ class TaskManager(object):
 
     """
 
-    def __init__(self, context, node_names, shared=False,
+    def __init__(self, context, node_names, shared=False, obj_info=None,
                  purpose='unspecified action'):
         """Create a new TaskManager.
 
@@ -187,16 +188,8 @@ class TaskManager(object):
         self.shared = shared
         self._purpose = purpose
         self._debug_timer = timeutils.StopWatch()
+        self.obj_info = obj_info
 
-        nodes = objects.Node.list_in(context, node_names,
-                                     filters=['reservation'], objs=None)
-        # As lock for multiple nodes is hard to detect the real problem, check
-        # posibble error at first.
-        if len(nodes) != node_names:
-            nodes = [node.name for node in nodes]
-            for name in node_names:
-                if name not in nodes:
-                    raise exception.NodeNotAvailable(node=name)
         try:
             LOG.debug("Attempting to get %(type)s lock on nodes %(names)s (for"
                       " %(purpose)s)",
@@ -206,7 +199,9 @@ class TaskManager(object):
                 self._lock()
             else:
                 self._debug_timer.restart()
-                self.nodes = nodes
+                self.nodes = objects.Node.list_in(context, node_names,
+                                                  filters=['reservation'],
+                                                  obj_info=obj_info)
 
         except Exception:
             with excutils.save_and_reraise_exception():
@@ -232,7 +227,8 @@ class TaskManager(object):
             wait_fixed=CONF.conductor.node_locked_retry_interval * 1000)
         def reserve_nodes():
             self.nodes = objects.Node.reserve_nodes(self.context, CONF.host,
-                                                    self.node_names)
+                                                    self.node_names,
+                                                    self.obj_info)
             LOG.debug("Node %(names)s successfully reserved for %(purpose)s "
                       "(took %(time).2f seconds)",
                       {'names': self.node_names, 'purpose': self._purpose,

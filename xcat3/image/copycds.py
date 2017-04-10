@@ -1,5 +1,4 @@
-import os
-import sys
+# coding=utf-8
 
 from oslo_config import cfg
 
@@ -11,6 +10,7 @@ from xcat3.image.os import base
 
 CONF = cfg.CONF
 
+
 def create(iso, image=None, install_dir=None):
     if not os.path.isfile(iso) or not os.access(iso, os.R_OK):
         raise exception.InvalidFile(name=iso)
@@ -19,7 +19,7 @@ def create(iso, image=None, install_dir=None):
     if not install_dir:
         install_dir = CONF.deploy.install_dir
     with utils.tempdir() as mntdir:
-        #tempdir = os.path.join(CONF.tempdir, 'copycds')
+        # tempdir = os.path.join(CONF.tempdir, 'copycds')
         mount_args = ['-t', 'udf,iso9660', '-o', 'ro,loop']
         sub_classes = base.get_subclasses(base.Image)
         utils.mount(iso, mntdir, *mount_args)
@@ -29,11 +29,13 @@ def create(iso, image=None, install_dir=None):
             if not image_info:
                 continue
             image_obj.copycd(image_info)
+            image_obj.upload(image_info)
         utils.umount(mntdir)
 
 
 def upload(image):
     print image
+
 
 def delete(image):
     print image

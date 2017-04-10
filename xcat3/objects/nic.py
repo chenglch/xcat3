@@ -1,5 +1,5 @@
 # coding=utf-8
-#
+#    Updated 2017 for xcat test purpose
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -24,10 +24,8 @@ from xcat3.objects import base
 from xcat3.objects import fields as object_fields
 
 
-# Note(chenglch): this part is not completed
-
 @base.XCAT3ObjectRegistry.register
-class Nics(base.XCAT3Object, object_base.VersionedObjectDictCompat):
+class Nic(base.XCAT3Object, object_base.VersionedObjectDictCompat):
     # Version 1.0: Initial version
     VERSION = '1.0'
 
@@ -35,18 +33,14 @@ class Nics(base.XCAT3Object, object_base.VersionedObjectDictCompat):
 
     fields = {
         'id': object_fields.IntegerField(),
-        'uuid': object_fields.UUIDField(nullable=True),
+        'uuid': object_fields.UUIDField(nullable=False),
         'name': object_fields.StringField(nullable=True),
         'node_id': object_fields.IntegerField(nullable=True),
-        'mac': object_fields.MACAddressField(nullable=True),
+        'mac': object_fields.MACAddressField(nullable=False),
         'ip': object_fields.StringField(nullable=True),
         'extra': object_fields.FlexibleDictField(nullable=True),
     }
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable_classmethod
     @classmethod
     def get(cls, context, id):
         """Find a nic.
@@ -68,10 +62,6 @@ class Nics(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         else:
             raise exception.InvalidIdentity(identity=id)
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable_classmethod
     @classmethod
     def get_by_id(cls, context, id):
         """Find a nic based on its integer id and return a Nic object.
@@ -85,10 +75,6 @@ class Nics(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         nic = cls._from_db_object(cls(context), db_nic)
         return nic
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable_classmethod
     @classmethod
     def get_by_uuid(cls, context, uuid):
         """Find a nic based on uuid and return a :class:`Nic` object.
@@ -121,10 +107,6 @@ class Nics(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         nic = cls._from_db_object(cls(context), db_nic)
         return nic
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable_classmethod
     @classmethod
     def list(cls, context, limit=None, sort_key=None, sort_dir=None):
         """Return a list of Nic objects.
@@ -166,10 +148,6 @@ class Nics(base.XCAT3Object, object_base.VersionedObjectDictCompat):
                                                 sort_dir=sort_dir)
         return cls._from_db_object_list(context, db_nics)
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable
     def create(self, context=None):
         """Create a Nic record in the DB.
 
@@ -187,10 +165,6 @@ class Nics(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         db_nic = self.dbapi.create_nic(values)
         self._from_db_object(self, db_nic)
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable
     def destroy(self, context=None):
         """Delete the Nic from the DB.
 
@@ -203,13 +177,9 @@ class Nics(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         :raises: NicNotFound
 
         """
-        self.dbapi.destroy_nic(self.uuid)
+        self.dbapi.destroy_nic(self.id)
         self.obj_reset_changes()
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable
     def save(self, context=None):
         """Save updates to this Nic.
 
@@ -226,15 +196,11 @@ class Nics(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         :raises: MACAlreadyExists if 'address' column is not unique
 
         """
-        pass
-        # updates = self.obj_get_changes()
-        # updated_nic = self.dbapi.update_nic(self.uuid, updates)
-        # self._from_db_object(self, updated_nic)
+        updates = self.obj_get_changes()
+        db_nic = self.dbapi.update_nic(self.id, updates)
+        self.updated_at = db_nic['updated_at']
+        self.obj_reset_changes()
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable
     def refresh(self, context=None):
         """Loads updates for this Nic.
 

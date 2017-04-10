@@ -21,15 +21,19 @@ Client side of the conductor RPC API.
 import futurist
 from futurist import rejection
 from futurist import waiters
-
+from oslo_log import log
 import oslo_messaging as messaging
+import six
 
 from xcat3.common import exception
 from xcat3.common import rpc
+from xcat3.common.i18n import _, _LE, _LI, _LW
 from xcat3.conductor import manager
 from xcat3.conf import CONF
 from xcat3.db import api as dbapi
 from xcat3.objects import base as objects_base
+
+LOG = log.getLogger(__name__)
 
 
 class ConductorAPI(object):
@@ -66,13 +70,35 @@ class ConductorAPI(object):
         :raises: NoFreeConductorWorker if worker pool is currently full.
 
         """
-        try:
-            future = self._executor.submit(func, *args, **kwargs)
-            if kwargs.get('names'):
-                setattr(future, 'nodes', kwargs['names'])
-        except futurist.RejectedSubmission:
-            raise exception.NoFreeAPIWorker()
-        return future
+
+        def _wocker(futures, func, *args, **kwargs):
+            try:
+                future = self._executor.submit(func, *args, **kwargs)
+                if kwargs.get('names'):
+                    setattr(future, 'nodes', kwargs['names'])
+                futures.append(future)
+            except futurist.RejectedSubmission:
+                raise exception.NoFreeAPIWorker()
+
+        futures = []
+        loop = 1
+        names = []
+        if kwargs.get('names') and len(
+                kwargs.get('names')) > CONF.api.per_group_count:
+            names = kwargs.pop('names')
+            loop = CONF.api.conductor_groups
+        if loop > 1:
+            groups = [[] for i in xrange(loop)]
+            per_group = len(names) / loop
+            for i in xrange(loop - 1):
+                groups[i].extend(names[i * per_group:(i + 1) * per_group])
+            groups[loop - 1].extend(names[(loop - 1) * per_group:])
+            for i in xrange(loop):
+                kwargs['names'] = groups[i]
+                _wocker(futures, func, *args, **kwargs)
+        else:
+            _wocker(futures, func, *args, **kwargs)
+        return futures
 
     def wait_workers(self, futures, timeout):
         """Wait the complete of multiple future objects
@@ -85,6 +111,11 @@ class ConductorAPI(object):
 
         """
         done, not_done = waiters.wait_for_all(futures, timeout)
+        for r in done:
+            if r.exception():
+                LOG.exception(_LE(
+                    'Error in wait_workers %(err)s'),
+                    {'err': six.text_type(r.exception())})
         return done, not_done
 
     def get_topic_for(self, nodes):
@@ -106,8 +137,9 @@ class ConductorAPI(object):
         host_id = 0
 
         for i in xrange(len(nodes)):
-            if i == (host_id + 1) * per_host and i != len(nodes) - 1:
-                host_id += 1
+            if i == (host_id + 1) * per_host:
+                host_id = host_id + 1 if host_id < len(conductors) - 1 \
+                    else host_id
             nodes_list[host_id].append(nodes[i])
 
         for i in xrange(len(conductors)):
@@ -140,9 +172,9 @@ class ConductorAPI(object):
         for topic, nodes in topic_dict.items():
             cctxt = self.client.prepare(topic=topic or self.topic,
                                         version='1.0')
-            future = self.spawn_worker(_change_power_state, cctxt, names=nodes,
-                                       target=target)
-            futures.append(future)
+            temp = self.spawn_worker(_change_power_state, cctxt, names=nodes,
+                                     target=target)
+            futures.extend(temp)
 
         return futures
 
@@ -166,8 +198,8 @@ class ConductorAPI(object):
         for topic, nodes in topic_dict.items():
             cctxt = self.client.prepare(topic=topic or self.topic,
                                         version='1.0')
-            future = self.spawn_worker(_get_power_state, cctxt, names=nodes)
-            futures.append(future)
+            temp = self.spawn_worker(_get_power_state, cctxt, names=nodes)
+            futures.extend(temp)
 
         return futures
 
@@ -192,12 +224,12 @@ class ConductorAPI(object):
         for topic, nodes in topic_dict.items():
             cctxt = self.client.prepare(topic=topic or self.topic,
                                         version='1.0')
-            future = self.spawn_worker(_destroy_nodes, cctxt, names=nodes)
-            futures.append(future)
+            temp = self.spawn_worker(_destroy_nodes, cctxt, names=nodes)
+            futures.extend(temp)
 
         return futures
 
-    def provision(self, context, names, target):
+    def provision(self, context, names, target, osimage):
         """Change nodes's provision state.
 
         Synchronously, acquire lock and start the conductor background task
@@ -211,18 +243,18 @@ class ConductorAPI(object):
 
         """
 
-        def _provision(cctxt, names, target):
+        def _provision(cctxt, names, target, osimage):
             return cctxt.call(context, 'provision', names=names,
-                              target=target)
+                              target=target, osimage=osimage)
 
         topic_dict = self.get_topic_for(names)
         futures = []
         for topic, nodes in topic_dict.items():
             cctxt = self.client.prepare(topic=topic or self.topic,
                                         version='1.0')
-            future = self.spawn_worker(_provision, cctxt, names=nodes,
-                                       target=target)
-            futures.append(future)
+            temp = self.spawn_worker(_provision, cctxt, names=nodes,
+                                     target=target, osimage=osimage)
+            futures.extend(temp)
 
         return futures
 
@@ -246,8 +278,8 @@ class ConductorAPI(object):
         for topic, nodes in topic_dict.items():
             cctxt = self.client.prepare(topic=topic or self.topic,
                                         version='1.0')
-            future = self.spawn_worker(_get_boot_device, cctxt, names=nodes)
-            futures.append(future)
+            temp = self.spawn_worker(_get_boot_device, cctxt, names=nodes)
+            futures.extend(temp)
 
         return futures
 
@@ -272,8 +304,8 @@ class ConductorAPI(object):
         for topic, nodes in topic_dict.items():
             cctxt = self.client.prepare(topic=topic or self.topic,
                                         version='1.0')
-            future = self.spawn_worker(_set_boot_device, cctxt, names=nodes,
-                                       boot_device=boot_device)
-            futures.append(future)
+            temp = self.spawn_worker(_set_boot_device, cctxt, names=nodes,
+                                     boot_device=boot_device)
+            futures.extend(temp)
 
         return futures

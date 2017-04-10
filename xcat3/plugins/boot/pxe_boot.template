@@ -1,0 +1,5 @@
+DEFAULT xCAT
+LABEL xCAT
+ KERNEL {{ kernel }}
+ APPEND initrd={{ initrd }} nofb utf8 auto url={{ os_config }}
+ IPAPPEND 2

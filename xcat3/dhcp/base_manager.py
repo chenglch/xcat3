@@ -31,6 +31,7 @@ from xcat3 import objects
 
 LOG = log.getLogger(__name__)
 
+
 class BaseConductorManager(object):
     def __init__(self, host, topic):
         super(BaseConductorManager, self).__init__()
@@ -90,7 +91,8 @@ class BaseConductorManager(object):
             # This conductor was already registered and did not shut down
             # properly, so log a warning and update the record.
             LOG.warning(
-                _LW("A conductor with hostname %(hostname)s service %(service)s was previously registered. Updating registration"),
+                _LW(
+                    "A conductor with hostname %(hostname)s service %(service)s was previously registered. Updating registration"),
                 {'hostname': self.host, 'service': self.service})
             self.conductor = objects.Conductor.register(
                 admin_context, self.host, self.service, update_existing=True)

@@ -1,3 +1,5 @@
+# coding=utf-8
+
 from oslo_log import log
 from xcat3.plugins.control import base
 from xcat3.common import exception

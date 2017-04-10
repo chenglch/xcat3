@@ -27,6 +27,8 @@ from xcat3.api.controllers import base
 from xcat3.api.controllers import link
 from xcat3.api.controllers.v1 import node
 from xcat3.api.controllers.v1 import network
+from xcat3.api.controllers.v1 import osimage
+from xcat3.api.controllers.v1 import nic
 from xcat3.api.controllers.v1 import versions
 from xcat3.api import expose
 from xcat3.common.i18n import _
@@ -91,7 +93,10 @@ class Controller(rest.RestController):
     """Version 1 API controllers root."""
 
     nodes = node.NodesController()
-    network = network.NetworkController()
+    networks = network.NetworkController()
+    osimages = osimage.OSImageController()
+    nics = nic.NicController()
+
     @expose.expose(V1)
     def get(self):
         # NOTE: The reason why convert() it's being called for every

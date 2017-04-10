@@ -98,8 +98,14 @@ Start xcat3 service
 Test Example
 ============
 
-Rest API Example
-----------------
+Command Line Command
+--------------------
+
+Please reference `python-xcat3client <https://github.com/chenglch/python-xcat3client>`_
+
+
+Rest API Example(Deprecated)
+----------------------------
 
 Create Node
 ::

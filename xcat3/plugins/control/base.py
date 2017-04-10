@@ -1,6 +1,9 @@
+# coding=utf-8
+
 import abc
 import six
 from xcat3.plugins import base
+
 
 @six.add_metaclass(abc.ABCMeta)
 class ControlInterface(base.BaseInterface):

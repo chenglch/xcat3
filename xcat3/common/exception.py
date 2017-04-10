@@ -185,6 +185,10 @@ class NetworkNotFound(NotFound):
     _msg_fmt = _("Network %(net)s could not be found")
 
 
+class OSImageNotFound(NotFound):
+    _msg_fmt = _("OSImage %(image)s could not be found")
+
+
 class NoValidHost(NotFound):
     _msg_fmt = _("No valid host was found. Reason: %(reason)s")
 
@@ -216,6 +220,10 @@ class NicAlreadyExists(Conflict):
 
 class NetworkAlreadyExists(Conflict):
     _msg_fmt = _("A network with name %(name)s already exists.")
+
+
+class OSImageAlreadyExists(Conflict):
+    _msg_fmt = _("A image with name %(name)s already exists.")
 
 
 class NotAuthorized(XCAT3Exception):
@@ -284,6 +292,10 @@ class NodeNotLocked(Invalid):
 
 class NicNotFound(NotFound):
     _msg_fmt = _("Nic %(nic)s could not be found.")
+
+
+class InvalidNicAttr(Invalid):
+    _msg_fmt = _("No node is associated with Nic %(mac)s.")
 
 
 class PluginNotFound(NotFound):

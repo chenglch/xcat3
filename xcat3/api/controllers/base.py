@@ -36,17 +36,20 @@ class APIBase(wtypes.Base):
                     if hasattr(self, k) and
                     getattr(self, k) != wsme.Unset)
 
-    def unset_fields_except(self, except_list=None):
+    def filter_fields(self, show_list=None, remove_list=None):
         """Unset fields so they don't appear in the message body.
 
-        :param except_list: A list of fields that won't be touched.
+        :param show_list: A list of fields that won't be touched.
+        :param remove_list: A list of fields will be hide.
 
         """
-        if except_list is None:
-            except_list = []
+        if remove_list is None:
+            remove_list = []
 
         for k in self.as_dict():
-            if k not in except_list:
+            if show_list and k not in show_list:
+                setattr(self, k, wsme.Unset)
+            if k in remove_list:
                 setattr(self, k, wsme.Unset)
 
 

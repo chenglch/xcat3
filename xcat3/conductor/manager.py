@@ -18,7 +18,8 @@
 """Conduct all activity related to bare-metal deployments.
 
 """
-
+import six
+import traceback
 from oslo_log import log
 import oslo_messaging as messaging
 from futurist import waiters
@@ -49,6 +50,12 @@ class ConductorManager(base_manager.BaseConductorManager):
     def __init__(self, host, topic):
         super(ConductorManager, self).__init__(host, topic)
 
+    def _fill_result(self, nodes, message=None):
+        result = {}
+        for node in nodes:
+            result[node.name] = message
+        return result
+
     def _process_nodes_worker(self, func, nodes, *args, **kwargs):
         """Wait the result from rpc call.
         :param func: the function should be called with green thread
@@ -68,7 +75,16 @@ class ConductorManager(base_manager.BaseConductorManager):
         for r in done:
             node = getattr(r, 'node')
             if r.exception():
-                result[node.name] = r.exception().message
+                # NOTE(chenglch): futurist exception_info returns tuple
+                # (exception, traceback). traceback is a object, print the
+                # traceback string with traceback module.
+                LOG.exception(_LE(
+                    'Error in _process_nodes_worker for node %(node)s: '
+                    '%(err)s'),
+                    {'node': node.name,
+                     'err': six.text_type(
+                         traceback.print_tb(r.exception_info()[1]))})
+                result[node.name] = six.text_type(r.exception())
             else:
                 result[node.name] = r.result() if r.result() else \
                     xcat3_states.SUCCESS
@@ -99,7 +115,7 @@ class ConductorManager(base_manager.BaseConductorManager):
             control_plugin.validate(node)
             control_plugin.set_power_state(node, target)
 
-        with task_manager.acquire(context, names,
+        with task_manager.acquire(context, names, obj_info=['nics',],
                                   purpose='change power state') as task:
             result = self._process_nodes_worker(_change_power_state,
                                                 nodes=task.nodes,
@@ -128,7 +144,8 @@ class ConductorManager(base_manager.BaseConductorManager):
             control_plugin.validate(node)
             return control_plugin.get_power_state(node)
 
-        with task_manager.acquire(context, names,
+        with task_manager.acquire(context, names, shared=True,
+                                  obj_info=['nics',],
                                   purpose='get power state') as task:
             result = self._process_nodes_worker(_get_power_state,
                                                 nodes=task.nodes)
@@ -165,7 +182,7 @@ class ConductorManager(base_manager.BaseConductorManager):
     @messaging.expected_exceptions(exception.InvalidParameterValue,
                                    exception.NoFreeConductorWorker,
                                    exception.NodeLocked)
-    def provision(self, context, names, target):
+    def provision(self, context, names, target, osimage):
         """RPC method to encapsulate changes to a node's state.
 
         :param context: an admin context.
@@ -181,21 +198,24 @@ class ConductorManager(base_manager.BaseConductorManager):
                  "The desired new state is %(target)s.",
                  {'nodes': str(names), 'target': target})
 
-        def _provision(node, target):
+        def _provision(node, target, osimage):
+            boot_plugin = mapping.get_boot_plugin(node)
+            boot_plugin.validate(node)
+            boot_plugin.prepare(node, osimage)
 
             # control_plugin, os_plugin, boot_plugin = mapping.get_plugin(node)
             # control_plugin.validate(node)
             # control_plugin.set_power_state(node, target)
-            pass
 
-        with task_manager.acquire(context, names,
+        with task_manager.acquire(context, names, obj_info=['nics', ],
                                   purpose='nodes provision') as task:
+            osimage = objects.OSImage.get_by_name(context, osimage)
             result = self._process_nodes_worker(_provision,
                                                 nodes=task.nodes,
-                                                target=target)
+                                                target=target, osimage=osimage)
 
-            #dhcp_topic = self.dhcp_api.get_topic_for()
-            self.dhcp_api.provision(context, names, target=target)
+            # dhcp_topic = self.dhcp_api.get_topic_for()
+            # self.dhcp_api.provision(context, names, target=target)
 
             return result
 
@@ -221,7 +241,8 @@ class ConductorManager(base_manager.BaseConductorManager):
             control_plugin.validate(node)
             return control_plugin.get_boot_device(node)
 
-        with task_manager.acquire(context, names,
+        with task_manager.acquire(context, names, shared=True,
+                                  obj_info=['nics', ],
                                   purpose='get_boot_device') as task:
             result = self._process_nodes_worker(_get_boot_device,
                                                 nodes=task.nodes)
@@ -251,7 +272,7 @@ class ConductorManager(base_manager.BaseConductorManager):
             control_plugin.validate(node)
             return control_plugin.set_boot_device(node, boot_device)
 
-        with task_manager.acquire(context, names,
+        with task_manager.acquire(context, names, obj_info=['nics',],
                                   purpose='set boot device') as task:
             result = self._process_nodes_worker(_set_boot_device,
                                                 nodes=task.nodes,

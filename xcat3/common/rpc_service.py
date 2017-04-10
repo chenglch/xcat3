@@ -29,7 +29,6 @@ LOG = log.getLogger(__name__)
 
 
 class RPCService(service.Service):
-
     def __init__(self, host, manager_module, manager_class):
         super(RPCService, self).__init__()
         self.host = host
@@ -82,7 +81,6 @@ class RPCService(service.Service):
 
     def _handle_signal_stop(self, signo, frame):
         self.stop()
-
 
     def handle_signal(self):
         """Add a signal handler for SIGUSR1.

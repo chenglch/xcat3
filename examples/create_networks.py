@@ -12,7 +12,7 @@ def create_data():
     net['netmask'] = '255.0.0.0'
     net['gateway'] = '10.0.0.103'
     net['dhcpserver'] = '10.4.40.22'
-    resp = requests.post('http://localhost:3010/v1/network', headers=headers,
+    resp = requests.post('http://localhost:3010/v1/networks', headers=headers,
                          data=json.dumps(net))
     print resp
     net = {}
@@ -21,16 +21,16 @@ def create_data():
     net['netmask'] = '255.0.0.0'
     net['gateway'] = '192.0.0.103'
     net['dhcpserver'] = '192.4.40.22'
-    resp = requests.post('http://localhost:3010/v1/network', headers=headers,
+    resp = requests.post('http://localhost:3010/v1/networks', headers=headers,
                          data=json.dumps(net))
     print resp
 
 
 def remove_data():
-    resp = requests.delete('http://localhost:3010/v1/network/install',
+    resp = requests.delete('http://localhost:3010/v1/networks/install',
                            headers=headers)
     print resp
-    resp = requests.delete('http://localhost:3010/v1/network/local',
+    resp = requests.delete('http://localhost:3010/v1/networks/local',
                            headers=headers)
     print resp
 

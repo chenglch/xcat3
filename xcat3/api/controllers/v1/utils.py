@@ -27,9 +27,7 @@ from xcat3.common.i18n import _
 from xcat3.common import utils
 from xcat3 import objects
 
-
 CONF = cfg.CONF
-
 
 JSONPATCH_EXCEPTIONS = (jsonpatch.JsonPatchException,
                         jsonpatch.JsonPointerException,
@@ -55,12 +53,24 @@ def validate_sort_dir(sort_dir):
 
 
 def apply_jsonpatch(doc, patch):
-    for p in patch:
+    i = 0
+    while i < len(patch):
+        p = patch[i]
         if p['op'] == 'add' and p['path'].count('/') == 1:
             if p['path'].lstrip('/') not in doc:
                 msg = _('Adding a new attribute (%s) to the root of '
                         ' the resource is not allowed')
                 raise wsme.exc.ClientSideError(msg % p['path'])
+        # NOTE(chenglch): To support `attr1/attr2=`, if attr2 is not exist
+        # just ignore this patch.
+        if p['op'] == 'remove' and p['path'].count('/') == 2:
+            paths = p['path'].lstrip('/').split('/')
+            if (not doc.get(paths[0]) or doc.get(paths[0]) and not doc.get(
+                    paths[0]).has_key(paths[1])):
+                del (patch[i])
+                continue
+        i += 1
+
     return jsonpatch.apply_patch(doc, jsonpatch.JsonPatch(patch))
 
 
@@ -90,7 +100,7 @@ def is_path_removed(patch, path):
     path = path.rstrip('/')
     for p in patch:
         if ((p['path'] == path or p['path'].startswith(path + '/')) and
-                p['op'] == 'remove'):
+                    p['op'] == 'remove'):
             return True
 
 
@@ -121,21 +131,6 @@ def get_node_obj(node):
         if not node_obj:
             raise exception.NodeNotFound(node=node.name)
         return node_obj
-
-    raise exception.InvalidName(name=node)
-
-
-def get_node_name(node):
-    """Get the node name from api node.
-
-    :param node: the api node.
-
-    :return: the name of api node
-    :raises: InvalidName if the name provided is not valid.
-    """
-    context = pecan.request.context
-    if type(node.name) != wsme.types.UnsetType:
-        return node.name
 
     raise exception.InvalidName(name=node)
 

@@ -1,6 +1,7 @@
 # -*- encoding: utf-8 -*-
 #
 # Copyright 2013 Hewlett-Packard Development Company, L.P.
+# Updated 2017 for xcat test purpose
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -67,7 +68,7 @@ class Connection(object):
 
     @abc.abstractmethod
     def get_node_list(self, filters=None, limit=None, marker=None,
-                      sort_key=None, sort_dir=None):
+                      sort_key=None, sort_dir=None, fields=None):
         """Return a list of nodes.
 
         :param filters: Filters to apply. Defaults to None.
@@ -91,32 +92,6 @@ class Connection(object):
         :param names: the nodes names to select
         :param filters: Filters to apply. Defaults to None.
         :return: a list of nodes
-        """
-
-    @abc.abstractmethod
-    def reserve_node(self, tag, node_id):
-        """Reserve a node.
-
-        To prevent other ManagerServices from manipulating the given
-        Node while a Task is performed, mark it reserved by this host.
-
-        :param tag: A string uniquely identifying the reservation holder.
-        :param node_id: A node id.
-        :returns: A Node object.
-        :raises: NodeNotFound if the node is not found.
-        :raises: NodeLocked if the node is already reserved.
-        """
-
-    @abc.abstractmethod
-    def release_node(self, tag, node_id):
-        """Release the reservation on a node.
-
-        :param tag: A string uniquely identifying the reservation holder.
-        :param node_id: A node id.
-        :raises: NodeNotFound if the node is not found.
-        :raises: NodeLocked if the node is reserved by another host.
-        :raises: NodeNotLocked if the node was found to not have a
-                 reservation at all.
         """
 
     @abc.abstractmethod
@@ -161,6 +136,10 @@ class Connection(object):
         """
 
     @abc.abstractmethod
+    def create_nodes(self, nodes_values):
+        """Create nodes"""
+
+    @abc.abstractmethod
     def get_node_by_id(self, node_id):
         """Return a node.
 
@@ -191,19 +170,21 @@ class Connection(object):
         """
 
     @abc.abstractmethod
-    def create_nic(self, values):
-        """Create a port
-        :param values: A dict containing several items used to identify
-                       and track the nic. For example:
+    def update_node(self, node_id, values):
+        """Update node attributes
 
-                       ::
+        :param node_id: the id of node
+        :values: patch for node
+        :returns: db node
+        """
 
-                        {
-                         'ip": '13.0.0.1'
-                         'mac': '43:87:0a:05:65:01',
-                         'primary': 'true'
-                        }
-        :returns: A nic.
+    @abc.abstractmethod
+    def update_nodes(self, node_ids, updates_dict):
+        """Update node attributes
+
+        :param node_ids: the ids of nodes
+        :values: patch for node
+        :returns: db nodes
         """
 
     @abc.abstractmethod
@@ -274,3 +255,28 @@ class Connection(object):
     @abc.abstractmethod
     def register_conductor(self, values, update_existing=False):
         """Register conductor nodes"""
+
+    @abc.abstractmethod
+    def get_image_by_id(self, id):
+        """Get image from id"""
+
+    @abc.abstractmethod
+    def get_image_by_name(self, name):
+        """Get image from name"""
+
+    @abc.abstractmethod
+    def get_image_list(self, filters=None, limit=None, sort_key=None,
+                       sort_dir=None):
+        """Get image list"""
+
+    @abc.abstractmethod
+    def create_image(self, values):
+        """Create image"""
+
+    @abc.abstractmethod
+    def destroy_image(self, name):
+        """Delete image"""
+
+    @abc.abstractmethod
+    def update_image(self, osimage_id, values):
+        """Update image"""

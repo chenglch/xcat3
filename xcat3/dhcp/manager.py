@@ -73,7 +73,6 @@ class ConductorManager(base_manager.BaseConductorManager):
             self.dhcp_service.add_subnet(network_opts)
         self.dhcp_service.build_conf()
 
-
     @messaging.expected_exceptions(exception.InvalidParameterValue,
                                    exception.NoFreeConductorWorker,
                                    exception.NodeLocked)

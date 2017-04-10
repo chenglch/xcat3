@@ -14,9 +14,9 @@ from xcat3.conf import CONF
 LOG = logging.getLogger(__name__)
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
+
 @six.add_metaclass(abc.ABCMeta)
 class DhcpBase(object):
-
     def __init__(self):
         self.subnet_opts = []
         self.node_opts = []
@@ -48,9 +48,9 @@ class ISCDHCPService(DhcpBase):
 
     def __init__(self):
         super(ISCDHCPService, self).__init__()
-        self.subnet_opts= list()
+        self.subnet_opts = list()
         self.node_opts = list()
-        #fileutils.ensure_tree(self.LEASES_PATH, mode=0o755)
+        # fileutils.ensure_tree(self.LEASES_PATH, mode=0o755)
 
     def enable(self):
         """Enables DHCP service."""
@@ -81,7 +81,7 @@ class ISCDHCPService(DhcpBase):
         """Disable DHCP service"""
 
         args = ['/usr/sbin/service', 'isc-dhcp-server', 'stop']
-        #args = ['dhcpd', '-user', 'dhcpd', '-group', 'dhcpd', '-f', '-q', '-4', '-pf', ''isc-dhcp-server', 'stop']
+        # args = ['dhcpd', '-user', 'dhcpd', '-group', 'dhcpd', '-f', '-q', '-4', '-pf', ''isc-dhcp-server', 'stop']
         try:
             utils.execute(args)
         except (OSError, ValueError) as e:

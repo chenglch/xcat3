@@ -278,7 +278,7 @@ class JsonPatchType(wtypes.Base):
         method may be overwritten by derived class.
 
         """
-        return ['/created_at', '/id', '/links', '/updated_at', '/uuid']
+        return ['/created_at', '/id', '/name', '/updated_at', '/uuid']
 
     @classmethod
     def non_removable_attrs(cls):
@@ -321,9 +321,7 @@ class JsonPatchType(wtypes.Base):
         return ret
 
 
-
 class VifType(JsonType):
-
     basetype = wtypes.text
     name = 'viftype'
 

@@ -11,8 +11,8 @@ LOG = log.getLogger(__name__)
 def get_cidr(network, netmask):
     return "%s/%s" % (network, netaddr.IPAddress(netmask).netmask_bits())
 
-class IPWrapper(object):
 
+class IPWrapper(object):
     def get_device_by_ip(self, ip):
         if not ip:
             return
@@ -40,7 +40,6 @@ class IPWrapper(object):
 
 
 class IPDevice(object):
-
     def __init__(self, name):
         self.name = name
         self.link = IPLink(self)
@@ -92,7 +91,6 @@ class IPDevice(object):
 
 
 class IPLink(object):
-
     def __init__(self, parent):
         self._parent = parent
 

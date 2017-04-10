@@ -1,6 +1,6 @@
 # coding=utf-8
 #
-#
+#    Updated 2017 for xcat test purpose
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
 #    a copy of the License at
@@ -20,7 +20,7 @@ from xcat3.common import exception
 from xcat3.db import api as db_api
 from xcat3.objects import base
 from xcat3.objects import fields as object_fields
-from xcat3.objects import nics as nics_object
+from xcat3.objects import nic as nic_object
 
 _UNSET_NICS_FIELDS = ('updated_at', 'created_at', 'id', 'node_id')
 
@@ -35,9 +35,10 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         'id': object_fields.IntegerField(),
         'name': object_fields.StringField(nullable=True),
         'arch': object_fields.StringField(nullable=True),
+        'netboot': object_fields.StringField(),
         'type': object_fields.StringField(nullable=True),
         'reservation': object_fields.StringField(nullable=True),
-        'mgt': object_fields.StringField(nullable=True),
+        'mgt': object_fields.StringField(),
         'state': object_fields.StringField(nullable=True),
         'nics_info': object_fields.FlexibleDictField(nullable=True),
         'osimage_info': object_fields.FlexibleDictField(nullable=True),
@@ -48,7 +49,7 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
 
     @classmethod
     def _get_nics_info(cls, context, node_id):
-        nics = nics_object.Nics.list_by_node_id(context, node_id)
+        nics = nic_object.Nic.list_by_node_id(context, node_id)
         nics_info = dict()
         nics_info['nics'] = []
         for nic in nics:
@@ -58,10 +59,6 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
             nics_info['nics'].append(nic)
         return nics_info
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable_classmethod
     @classmethod
     def get(cls, context, node_id):
         """Find a node based on its id and return a Node object.
@@ -74,10 +71,6 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         else:
             raise exception.InvalidIdentity(identity=node_id)
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable_classmethod
     @classmethod
     def get_by_id(cls, context, node_id):
         """Find a node based on its integer id and return a Node object.
@@ -106,10 +99,6 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         setattr(node, 'nics_info', nics_info)
         return node
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable_classmethod
     @classmethod
     def list(cls, context, limit=None, sort_key=None, sort_dir=None,
              filters=None, fields=None):
@@ -125,8 +114,10 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         """
         db_nodes = cls.dbapi.get_node_list(filters=filters, limit=limit,
                                            sort_key=sort_key,
-                                           sort_dir=sort_dir)
+                                           sort_dir=sort_dir,
+                                           fields=fields)
         nodes = cls._from_db_object_list(context, db_nodes)
+
         if not fields or 'nics_info' not in fields:
             return nodes
 
@@ -136,75 +127,56 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         return nodes
 
     @classmethod
-    def list_in(cls, context, names, filters=None, objs=['nics']):
+    def list_in(cls, context, names, filters=None, obj_info=None):
         """Return a list of Node objects within the names
-
 
         :returns: a list of :class:`Node` object with nics info
         """
         db_nodes = cls.dbapi.get_node_in(names, filters)
         nodes = cls._from_db_object_list(context, db_nodes)
-        if objs and 'nics' in objs:
+
+        if obj_info and 'nics' in obj_info:
+            node_ids = [db_node.id for db_node in db_nodes]
+            db_nics = cls.dbapi.get_nics_in_node_ids(node_ids)
+            nics = nic_object.Nic._from_db_object_list(context, db_nics)
+
+            node_map = dict((node.id, []) for node in nodes)
+            for nic in nics:
+                node_id = nic.node_id
+                for field in _UNSET_NICS_FIELDS:
+                    delattr(nic, field)
+                node_map[node_id].append(nic.as_dict())
+
             for node in nodes:
-                nics_info = cls._get_nics_info(context, node.id)
+                nics_info = {'nics': node_map[node.id]}
                 setattr(node, 'nics_info', nics_info)
+
         return nodes
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable_classmethod
     @classmethod
-    def reserve(cls, context, tag, node_id):
-        """Get and reserve a node.
-
-        To prevent other ManagerServices from manipulating the given
-        Node while a Task is performed, mark it reserved by this host.
-
-        :param context: Security context.
-        :param tag: A string uniquely identifying the reservation holder.
-        :param node_id: A node id
-        :raises: NodeNotFound if the node is not found.
-        :returns: a :class:`Node` object.
-
-        """
-        db_node = cls.dbapi.reserve_node(tag, node_id)
-        node = cls._from_db_object(cls(context), db_node)
-        return node
-
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable_classmethod
-    @classmethod
-    def release(cls, context, tag, node_id):
-        """Release the reservation on a node.
-
-        :param context: Security context.
-        :param tag: A string uniquely identifying the reservation holder.
-        :param node_id: A node id
-        :raises: NodeNotFound if the node is not found.
-
-        """
-        cls.dbapi.release_node(tag, node_id)
-
-    @classmethod
-    def reserve_nodes(cls, context, tag, node_names):
+    def reserve_nodes(cls, context, tag, node_names, obj_info=None):
         db_nodes = cls.dbapi.reserve_nodes(tag, node_names)
+
         nodes = cls._from_db_object_list(context, db_nodes)
-        for node in nodes:
-            nics_info = cls._get_nics_info(context, node.id)
-            setattr(node, 'nics_info', nics_info)
+
+        if obj_info and 'nics' in obj_info:
+            node_ids = [db_node.id for db_node in db_nodes]
+            db_nics = cls.dbapi.get_nics_in_node_ids(node_ids)
+            nics = nic_object.Nic._from_db_object_list(context, db_nics)
+
+            node_map = dict((node.id, []) for node in nodes)
+            for nic in nics:
+                node_map[nic.node_id].append(nic.as_dict())
+
+            for node in nodes:
+                nics_info = {'nics': node_map[node.id]}
+                setattr(node, 'nics_info', nics_info)
         return nodes
 
     @classmethod
     def release_nodes(cls, context, tag, node_names):
         cls.dbapi.release_nodes(tag, node_names)
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable
     def create(self, context=None):
         """Create a Node record in the DB.
 
@@ -222,13 +194,16 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         :raises: InvalidParameterValue if some property values are invalid.
         """
         values = self.obj_get_changes()
-        db_node = self.dbapi.create_node(values)
-        self._from_db_object(self, db_node)
+        self.dbapi.create_node(values)
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable
+    @classmethod
+    def create_nodes(cls, nodes_values):
+        values = []
+        for node in nodes_values:
+            value = node.obj_get_changes()
+            values.append(value)
+        cls.dbapi.create_nodes(values)
+
     def destroy(self, context=None):
         """Delete the Node from the DB.
 
@@ -244,7 +219,7 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
 
     @classmethod
     def destroy_nodes(cls, nodes, context=None):
-        """Delete the Node from the DB.
+        """Delete nodes from the DB.
 
         :param context: Security context. NOTE: This should only
                         be used internally by the indirection_api.
@@ -258,10 +233,17 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         for node in nodes:
             node.obj_reset_changes()
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable
+    @classmethod
+    def update_nodes(cls, nodes):
+        updates_dict = {}
+        node_ids = []
+        for node in nodes:
+            updates = node.obj_get_changes()
+            updates_dict[node.id] = updates
+            node_ids.append(node.id)
+        db_nodes = cls.dbapi.update_nodes(node_ids, updates_dict)
+
+
     def save(self, context=None):
         """Save updates to this Node.
 
@@ -280,10 +262,5 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         """
         updates = self.obj_get_changes()
         db_node = self.dbapi.update_node(self.id, updates)
-
-        # TODO(galyna): updating specific field not touching others to not
-        # change default behaviour. Otherwise it will break a bunch of tests
-        # This can be updated in other way when more fields like `updated_at`
-        # will appear
         self.updated_at = db_node['updated_at']
         self.obj_reset_changes()

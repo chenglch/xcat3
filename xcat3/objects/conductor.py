@@ -1,6 +1,8 @@
 # coding=utf-8
 #
 # Copyright 2013 Hewlett-Packard Development Company, L.P.
+#  Updated 2017 for xcat test purpose
+#
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
@@ -32,10 +34,6 @@ class Conductor(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         'hostname': object_fields.StringField(),
     }
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable_classmethod
     @classmethod
     def get_by_hostname(cls, context, hostname):
         """Get a Conductor record by its hostname.
@@ -52,18 +50,10 @@ class Conductor(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         raise NotImplementedError(
             _('Cannot update a conductor record directly.'))
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable
     def touch(self, context=None):
         """Touch this conductor's DB record, marking it as up-to-date."""
         self.dbapi.touch_conductor(self.hostname)
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable
     @classmethod
     def register(cls, context, hostname, service='conductor',
                  update_existing=False):
@@ -84,10 +74,6 @@ class Conductor(base.XCAT3Object, object_base.VersionedObjectDictCompat):
             update_existing=update_existing)
         return cls._from_db_object(cls(context), db_cond)
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable
     def unregister(self, context=None):
         """Remove this conductor from the service registry."""
         self.dbapi.unregister_conductor(self.hostname)

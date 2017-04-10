@@ -14,6 +14,7 @@ def gen_data(n=10):
         d['name'] = 'node%d' % i
         name = {'name': d['name']}
         d['mgt'] = 'ipmi'
+        d['netboot'] = 'pxe'
         d['arch'] = 'x86_64' if i % 2 == 0 else 'ppc64le'
         d['control_info'] = {
             'bmc_address': '11.0.%d.%d' % (num[0], num[1]),
@@ -35,6 +36,7 @@ def gen_data(n=10):
     d = dict()
     d['name'] = 'xcat3test1'
     d['mgt'] = 'kvm'
+    d['netboot'] = 'pxe'
     d['arch'] = 'x86_64'
     d['control_info'] = {'ssh_username': 'root', 'ssh_virt_type': 'virsh',
                          'ssh_address': '10.5.102.1',
@@ -47,6 +49,7 @@ def gen_data(n=10):
     d = dict()
     d['name'] = 'xcat3test2'
     d['mgt'] = 'kvm'
+    d['netboot'] = 'pxe'
     d['arch'] = 'x86_64'
     d['control_info'] = {'ssh_username': 'root', 'ssh_virt_type': 'virsh',
                          'ssh_address': '10.5.102.1',

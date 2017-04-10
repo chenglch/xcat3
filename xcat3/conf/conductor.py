@@ -49,6 +49,12 @@ opts = [
                default=3660,
                help=_('Maximum time (in seconds) to process task in a worker'
                       'thread.')),
+    cfg.StrOpt('host_ip',
+               default='127.0.0.1',
+               help=_('The IP address on which xcat3-api listens.')),
+    cfg.IntOpt('workers',
+                help='Number of workers for xCAT3 Conductor service. '
+                     'The default will be the number of CPUs available.')
 ]
 
 

@@ -30,6 +30,7 @@ import shutil
 import six
 import tempfile
 import time
+import collections
 
 from oslo_concurrency import processutils
 from oslo_log import log as logging
@@ -39,7 +40,6 @@ from oslo_utils import timeutils
 from xcat3.conf import CONF
 from xcat3.common import exception
 from xcat3.common.i18n import _, _LE, _LW
-
 
 LOG = logging.getLogger(__name__)
 
@@ -231,8 +231,8 @@ def validate_and_normalize_mac(address):
     :raises: InvalidMAC If the MAC address is not valid.
 
     """
-    #if not netutils.is_valid_mac(address):
-    #    raise exception.InvalidMAC(mac=address)
+    if not netutils.is_valid_mac(address):
+        raise exception.InvalidMAC(mac=address)
     return address.lower()
 
 
@@ -293,6 +293,17 @@ def create_link_without_raise(source, link):
                 {'source': source, 'link': link, 'e': e})
 
 
+def unlink_without_raise(path):
+    try:
+        os.unlink(path)
+    except OSError as e:
+        if e.errno == errno.ENOENT:
+            return
+        else:
+            LOG.warning("Failed to unlink %(path)s, error: %(e)s",
+                        {'path': path, 'e': e})
+
+
 def safe_rstrip(value, chars=None):
     """Removes trailing characters from a string if that does not make it empty
 
@@ -320,8 +331,12 @@ def mount(src, dest, *args):
     :raises: processutils.ProcessExecutionError if it failed
         to run the process.
     """
-    args = ('mount', ) + args + (src, dest)
+    args = ('mount',) + args + (src, dest)
     execute(*args, run_as_root=True, check_exit_code=[0])
+
+
+def retry_if_command_error(exception):
+    return isinstance(exception, processutils.ProcessExecutionError)
 
 
 def umount(loc, *args):
@@ -333,7 +348,7 @@ def umount(loc, *args):
     :raises: processutils.ProcessExecutionError if it failed
         to run the process.
     """
-    args = ('umount', ) + args + (loc, )
+    args = ('umount',) + args + (loc,)
     execute(*args, run_as_root=True, check_exit_code=[0])
 
 
@@ -380,6 +395,7 @@ def warn_about_deprecated_extra_vif_port_id():
                         "be supported in Pike release. API endpoint "
                         "v1/nodes/<node>/vifs should be used instead."))
 
+
 def normalize_mac(mac):
     """Remove '-' and ':' characters and lowercase the MAC string.
 
@@ -402,13 +418,16 @@ def validate_network_port(port, port_name="Port"):
     except ValueError:
         raise exception.InvalidParameterValue(_(
             '%(port_name)s "%(port)s" is not a valid integer.') %
-            {'port_name': port_name, 'port': port})
+                                              {'port_name': port_name,
+                                               'port': port})
     if port < 1 or port > 65535:
         raise exception.InvalidParameterValue(_(
             '%(port_name)s "%(port)s" is out of range. Valid port '
             'numbers must be between 1 and 65535.') %
-            {'port_name': port_name, 'port': port})
+                                              {'port_name': port_name,
+                                               'port': port})
     return port
+
 
 @contextlib.contextmanager
 def record_time(times, enabled, *args):
@@ -428,3 +447,21 @@ def record_time(times, enabled, *args):
         yield
         end = time.time()
         times.append((' '.join(args), start, end))
+
+
+def get_api_url():
+    if not CONF.api.enable_ssl_api:
+        url = 'http://%s:%s/' % (CONF.api.host_ip, CONF.api.port)
+    else:
+        url = 'http://%s:%s/' % (CONF.api.host_ip, CONF.api.port)
+    return url
+
+
+def get_duplicate_list(elements):
+    """Return the duplicate elements
+
+    :param: a list may contains duplicate element
+    :return duplicate item list
+    """
+    return [item for item, count in collections.Counter(elements).items() if
+            count > 1]

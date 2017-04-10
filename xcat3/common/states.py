@@ -36,20 +36,11 @@ LOG = logging.getLogger(__name__)
 # Power states
 ##############
 
-POWER_ON = 'power on'
+POWER_ON = 'on'
 """ Node is powered on. """
 
-POWER_OFF = 'power off'
+POWER_OFF = 'off'
 """ Node is powered off. """
-
-REBOOT = 'rebooting'
-""" Node is rebooting. """
-
-SOFT_REBOOT = 'soft rebooting'
-""" Node is rebooting gracefully. """
-
-SOFT_POWER_OFF = 'soft power off'
-""" Node is in the process of soft power off. """
 
 ################
 # Request states
@@ -58,6 +49,7 @@ SOFT_POWER_OFF = 'soft power off'
 FAIL = 'failed'
 SUCCESS = 'ok'
 DELETED = 'deleted'
+UPDATED = 'updated'
 
 ################
 # Power command

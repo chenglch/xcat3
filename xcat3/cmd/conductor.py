@@ -9,6 +9,7 @@ import sys
 from oslo_config import cfg
 from oslo_log import log
 from oslo_service import service
+from oslo_concurrency import processutils
 
 from xcat3.common.i18n import _LW
 from xcat3.common import rpc_service
@@ -28,8 +29,8 @@ def main():
     mgr = rpc_service.RPCService(CONF.host,
                                  'xcat3.conductor.manager',
                                  'ConductorManager')
-
-    launcher = service.launch(CONF, mgr)
+    workers = CONF.conductor.workers or processutils.get_worker_count()
+    launcher = service.launch(CONF, mgr, workers=workers)
     launcher.wait()
 
 

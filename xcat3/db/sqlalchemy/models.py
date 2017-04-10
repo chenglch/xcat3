@@ -81,11 +81,12 @@ class Node(Base):
         schema.UniqueConstraint('name', name='uniq_nodes0name'),
         table_args())
     id = Column(Integer, primary_key=True)
-    name = Column(String(255), nullable=True)
-    mgt = Column(String(36), nullable=True)
-    arch = Column(String(15), nullable=True)
-    type = Column(String(15), nullable=True)
-    state = Column(String(15), nullable=True)
+    name = Column(String(255))
+    mgt = Column(String(16))
+    netboot = Column(String(16))
+    arch = Column(String(16), nullable=True)
+    type = Column(String(16), nullable=True)
+    state = Column(String(16), nullable=True)
     task_action = Column(String(20), nullable=True)
     osimage_id = Column(Integer, ForeignKey('osimage.id'), nullable=True)
     scripts_names = Column(String(255), nullable=True)
@@ -96,6 +97,11 @@ class Node(Base):
                                 ForeignKey('conductors.id',
                                            name='nodes_conductor_affinity_fk'),
                                 nullable=True)
+    nics = orm.relationship(
+        "Nics",
+        backref='node',
+        primaryjoin='and_(Nics.node_id == Node.id)',
+    )
 
 
 class Nics(Base):
@@ -144,7 +150,10 @@ class OSImage(Base):
         schema.UniqueConstraint('name', name='uniq_osimage0name'),
         table_args())
     id = Column(Integer, primary_key=True)
-    name = Column(String(255), nullable=True)
+    name = Column(String(255), nullable=False)
+    arch = Column(String(16), nullable=False)
+    ver = Column(String(16), nullable=False)
+    distro = Column(String(16), nullable=False)
     profile = Column(String(36), nullable=True)
     type = Column(String(36), nullable=True)
     provmethod = Column(String(36), nullable=True)

@@ -22,7 +22,7 @@ from xcat3.objects import fields as object_fields
 
 
 @base.XCAT3ObjectRegistry.register
-class Network(base.XCAT3Object, object_base.VersionedObjectDictCompat):
+class OSImage(base.XCAT3Object, object_base.VersionedObjectDictCompat):
     VERSION = '1'
 
     dbapi = db_api.get_instance()
@@ -30,37 +30,36 @@ class Network(base.XCAT3Object, object_base.VersionedObjectDictCompat):
     fields = {
         'id': object_fields.IntegerField(),
         'name': object_fields.StringField(nullable=False),
-        'subnet': object_fields.StringField(nullable=True),
-        'netmask': object_fields.StringField(nullable=True),
-        'gateway': object_fields.StringField(nullable=True),
-        'dhcpserver': object_fields.StringField(nullable=True),
-        'nameservers': object_fields.StringField(nullable=True),
-        'ntpservers': object_fields.FlexibleDictField(nullable=True),
-        'dynamic_range': object_fields.StringField(nullable=True),
-        'extra': object_fields.FlexibleDictField(nullable=True),
+        'ver': object_fields.StringField(nullable=False),
+        'arch': object_fields.StringField(nullable=False),
+        'distro': object_fields.StringField(nullable=False),
+        'profile': object_fields.StringField(nullable=True),
+        'type': object_fields.StringField(nullable=True),
+        'provmethod': object_fields.StringField(nullable=True),
+        'rootfstype': object_fields.StringField(nullable=True),
     }
 
     @classmethod
-    def get_by_id(cls, context, network_id):
-        """Find a network based on its integer id and return a Network object.
+    def get_by_id(cls, context, image_id):
+        """Find a network based on its integer id and return a OSImage object.
 
-        :param network_id: the id of a network.
-        :returns: a :class:`Network` object.
+        :param network_id: the id of a image.
+        :returns: a :class:`OSImage` object.
         """
-        db_network = cls.dbapi.get_network_by_id(network_id)
-        network = cls._from_db_object(cls(context), db_network)
-        return network
+        db_image = cls.dbapi.get_image_by_id(image_id)
+        image = cls._from_db_object(cls(context), db_image)
+        return image
 
     @classmethod
     def get_by_name(cls, context, name):
-        """Find a network based on name and return a Network object.
+        """Find a image based on name and return a OSImage object.
 
-        :param name: the name of a network.
-        :returns: a :class:`Network` object.
+        :param name: the name of a image.
+        :returns: a :class:`OSImage` object.
         """
-        db_network = cls.dbapi.get_network_by_name(name)
-        network = cls._from_db_object(cls(context), db_network)
-        return network
+        db_image = cls.dbapi.get_image_by_name(name)
+        image = cls._from_db_object(cls(context), db_image)
+        return image
 
     @classmethod
     def list(cls, context, limit=None, sort_key=None, sort_dir=None,
@@ -72,17 +71,17 @@ class Network(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         :param sort_key: column to sort results by.
         :param sort_dir: direction to sort. "asc" or "desc".
         :param filters: Filters to apply.
-        :returns: a list of :class:`Network` object.
+        :returns: a list of :class:`OSImage` object.
 
         """
-        db_networks = cls.dbapi.get_network_list(filters=filters, limit=limit,
-                                                 sort_key=sort_key,
-                                                 sort_dir=sort_dir)
-        networks = cls._from_db_object_list(context, db_networks)
-        return networks
+        db_images = cls.dbapi.get_image_list(filters=filters, limit=limit,
+                                             sort_key=sort_key,
+                                             sort_dir=sort_dir)
+        images = cls._from_db_object_list(context, db_images)
+        return images
 
     def create(self, context=None):
-        """Create a network record in the DB.
+        """Create a image record in the DB.
 
         Column-wise updates will be made based on the result of
         self.what_changed().
@@ -96,11 +95,11 @@ class Network(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         :raises: InvalidParameterValue if some property values are invalid.
         """
         values = self.obj_get_changes()
-        db_network = self.dbapi.create_network(values)
-        self._from_db_object(self, db_network)
+        db_image = self.dbapi.create_image(values)
+        self._from_db_object(self, db_image)
 
     def destroy(self, context=None):
-        """Delete the network from the DB.
+        """Delete the image from the DB.
 
         :param context: Security context. NOTE: This should only
                         be used internally by the indirection_api.
@@ -109,11 +108,11 @@ class Network(base.XCAT3Object, object_base.VersionedObjectDictCompat):
                         A context should be set when instantiating the
                         object, e.g.: Node(context)
         """
-        self.dbapi.destroy_network(self.name)
+        self.dbapi.destroy_image(self.name)
         self.obj_reset_changes()
 
     def save(self, context=None):
-        """Save updates to this Node.
+        """Save updates to this image.
 
         Column-wise updates will be made based on the result of
         self.what_changed().
@@ -127,6 +126,6 @@ class Network(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         :raises: InvalidParameterValue if some property values are invalid.
         """
         updates = self.obj_get_changes()
-        db_network = self.dbapi.update_network(self.id, updates)
-        self.updated_at = db_network['updated_at']
+        db_image = self.dbapi.update_image(self.id, updates)
+        self.updated_at = db_image['updated_at']
         self.obj_reset_changes()

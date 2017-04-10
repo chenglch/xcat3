@@ -1,4 +1,7 @@
+# coding=utf-8
+
 from xcat3.image.os import base
+
 
 class RedhatImage(base.Image):
     def __init__(self, path, install_dir, name):

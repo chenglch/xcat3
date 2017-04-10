@@ -1,6 +1,7 @@
 # -*- encoding: utf-8 -*-
 #
 # Copyright 2013 Hewlett-Packard Development Company, L.P.
+# Updated 2017 for xcat test purpose
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -18,6 +19,7 @@
 
 import collections
 import datetime
+import six
 import threading
 
 from oslo_db import exception as db_exc
@@ -32,6 +34,7 @@ from sqlalchemy.orm.exc import NoResultFound, MultipleResultsFound
 from sqlalchemy.orm import joinedload
 from sqlalchemy import sql
 from sqlalchemy import or_
+from sqlalchemy import not_
 from xcat3.common import exception
 from xcat3.common.i18n import _, _LW
 from xcat3.conf import CONF
@@ -123,30 +126,45 @@ class Connection(api.Connection):
         pass
 
     def create_node(self, values):
-        node = models.Node()
-        node.update(values)
+        node_model = models.Node()
+        node_model.update(values)
         nics_info = values.get('nics_info')
+        if nics_info:
+            for nic in nics_info['nics']:
+                nic_model = models.Nics()
+                if nic.get('primary') is not None:
+                    nic['extra'] = {'primary': True}
+                nic['uuid'] = uuidutils.generate_uuid()
+                nic_model.update(nic)
+                node_model.nics.append(nic_model)
 
         with _session_for_write() as session:
             try:
-                session.add(node)
-                session.flush()
-                if nics_info:
-                    session.refresh(node)
-                    for nic in nics_info['nics']:
-                        nics = models.Nics()
-                        nic['node_id'] = node.id
-                        nic['uuid'] = uuidutils.generate_uuid()
-                        if nic.get('primary') is not None:
-                            nic['extra'] = {'primary': True}
-                        nics.update(nic)
-                        session.add(nics)
-                        session.flush()
+                session.add(node_model)
             except db_exc.DBDuplicateEntry as exc:
                 if 'mac' in exc.columns:
                     raise exc
                 raise exception.DuplicateName(name=values['name'])
-            return node
+            return node_model
+
+    def create_nodes(self, nodes_values):
+        node_models = []
+        for values in nodes_values:
+            node_model = models.Node()
+            node_model.update(values)
+            nics_info = values.get('nics_info')
+            if nics_info:
+                for nic in nics_info['nics']:
+                    nic_model = models.Nics()
+                    if nic.get('primary') is not None:
+                        nic['extra'] = {'primary': True}
+                    nic['uuid'] = uuidutils.generate_uuid()
+                    nic_model.update(nic)
+                    node_model.nics.append(nic_model)
+            node_models.append(node_model)
+        with _session_for_write() as session:
+            session.add_all(node_models)
+            return node_models
 
     def get_node_by_id(self, node_id):
         query = model_query(models.Node)
@@ -186,10 +204,9 @@ class Connection(api.Connection):
             if not nodes:
                 raise exception.NodeNotFound(node=node_ids)
             # delete the nics related to the nodes
-            for node in nodes:
-                nics_query = model_query(models.Nics)
-                nics_query = nics_query.filter_by(node_id=node['id'])
-                nics_query.delete()
+            nics_query = model_query(models.Nics).filter(
+                models.Nics.node_id.in_(node_ids))
+            nics_query.delete(synchronize_session=False)
             query.delete(synchronize_session=False)
 
     def get_nodeinfo_list(self, columns=None, filters=None, limit=None,
@@ -206,14 +223,29 @@ class Connection(api.Connection):
         return _paginate_query(models.Node, limit, sort_key, sort_dir, query)
 
     def get_node_list(self, filters=None, limit=None, sort_key=None,
-                      sort_dir=None):
-        query = model_query(models.Node)
-        return _paginate_query(models.Node, limit, sort_key, sort_dir, query)
+                      sort_dir=None, fields=None):
+        if not fields:
+            query = model_query(models.Node)
+            return _paginate_query(models.Node, limit, sort_key, sort_dir,
+                                   query)
 
-    def get_node_in(self, node_names, filters=None):
-        query = model_query(models.Node).filter(models.Node.name.in_(
-            node_names))
-        if 'reservation' in filters:
+        # only query name column, for node list query
+        if fields and len(fields) == 1 and fields[0] == 'name':
+            query = model_query(models.Node.name)
+            return query.all()
+
+    def get_node_in(self, node_names, filters=None, fields=None):
+        if fields and len(fields) == 1 and 'name' in fields and filters \
+                and 'not_reservation' in filters:
+            query = model_query(models.Node.name).filter(models.Node.name.in_(
+                node_names)).filter(models.Node.reservation.isnot(None))
+        elif fields and len(fields) == 1 and 'name' in fields:
+            query = model_query(models.Node.name).filter(models.Node.name.in_(
+                node_names))
+        else:
+            query = model_query(models.Node).filter(models.Node.name.in_(
+                node_names))
+        if filters and 'reservation' in filters:
             query = query.filter_by(reservation=None)
         return query.all()
 
@@ -282,6 +314,57 @@ class Connection(api.Connection):
             except NoResultFound:
                 raise exception.NodeNotFound(node_id)
 
+    def update_node(self, node_id, values):
+        try:
+            return self._do_update_node(node_id, values)
+        except db_exc.DBDuplicateEntry as e:
+            if 'name' in e.columns:
+                raise exception.DuplicateName(name=values['name'])
+            else:
+                raise
+
+    def _do_update_node(self, node_id, values):
+        with _session_for_write() as session:
+            query = model_query(models.Node)
+            query = add_identity_filter(query, node_id)
+            try:
+                node = query.with_lockmode('update').one()
+            except NoResultFound:
+                raise exception.NodeNotFound(node=node_id)
+
+            node.update(values)
+            nics_info = values.get('nics_info')
+            if nics_info:
+                nics = self.get_nics_by_node_id(node.id)
+                for nic in nics:
+                    self.destroy_nic(nic.id)
+
+                for nic in nics_info['nics']:
+                    nics = models.Nics()
+                    nic['node_id'] = node.id
+                    nic['uuid'] = uuidutils.generate_uuid()
+                    if nic.get('primary') is not None:
+                        nic['extra'] = {'primary': True}
+                    nics.update(nic)
+                    session.add(nics)
+                    session.flush()
+        return node
+
+    def update_nodes(self, node_ids, updates_dict):
+        with _session_for_write() as session:
+            query = model_query(models.Node).filter(models.Node.id.in_(
+                node_ids))
+            try:
+                nodes = query.with_lockmode('update').all()
+            except NoResultFound:
+                raise exception.NodeNotFound(node=','.join(node_ids))
+            node_models = []
+            for node in nodes:
+                node.update(updates_dict[node.id])
+                node_models.append(node)
+            session.add_all(node_models)
+            return node_models
+
     def create_nic(self, values):
         if not values.get('uuid'):
             values['uuid'] = uuidutils.generate_uuid()
@@ -326,23 +409,12 @@ class Connection(api.Connection):
                             sort_dir=None):
         query = model_query(models.Nics)
         query = query.filter_by(node_id=node_id)
-        return _paginate_query(models.Nics, limit, sort_key, sort_dir, query)
+        return query.all()
 
-    def create_nic(self, values):
-        if not values.get('uuid'):
-            values['uuid'] = uuidutils.generate_uuid()
-
-        nic = models.Nics()
-        nic.update(values)
-        with _session_for_write() as session:
-            try:
-                session.add(nic)
-                session.flush()
-            except db_exc.DBDuplicateEntry as exc:
-                if 'mac' in exc.columns:
-                    raise exception.MACAlreadyExists(mac=values['mac'])
-                raise exception.NicAlreadyExists(uuid=values['uuid'])
-            return nic
+    def get_nics_in_node_ids(self, node_ids):
+        query = model_query(models.Nics).filter(models.Nics.node_id.in_(
+            node_ids))
+        return query.all()
 
     def update_nic(self, nic_id, values):
         # NOTE(dtantsur): this can lead to very strange errors
@@ -388,9 +460,10 @@ class Connection(api.Connection):
             raise exception.NetworkNotFound(net=name)
 
     def get_network_list(self, filters=None, limit=None, sort_key=None,
-                      sort_dir=None):
+                         sort_dir=None):
         query = model_query(models.Networks)
-        return _paginate_query(models.Networks, limit, sort_key, sort_dir, query)
+        return _paginate_query(models.Networks, limit, sort_key, sort_dir,
+                               query)
 
     def create_network(self, values):
         network = models.Networks()
@@ -478,42 +551,6 @@ class Connection(api.Connection):
             if count == 0:
                 raise exception.ConductorNotFound(conductor=hostname)
 
-    def update_node(self, node_id, values):
-        try:
-            return self._do_update_node(node_id, values)
-        except db_exc.DBDuplicateEntry as e:
-            if 'name' in e.columns:
-                raise exception.DuplicateName(name=values['name'])
-            else:
-                raise
-
-    def _do_update_node(self, node_id, values):
-        with _session_for_write() as session:
-            query = model_query(models.Node)
-            query = add_identity_filter(query, node_id)
-            try:
-                node = query.with_lockmode('update').one()
-            except NoResultFound:
-                raise exception.NodeNotFound(node=node_id)
-
-            node.update(values)
-            nics_info = values.get('nics_info')
-            if nics_info:
-                session.refresh(node)
-                nics = self.get_nics_by_node_id(node.id)
-                for nic in nics:
-                    self.destroy_nic(nic.id)
-
-                for nic in nics_info['nics']:
-                    nics = models.Nics()
-                    nic['node_id'] = node.id
-                    nic['uuid'] = uuidutils.generate_uuid()
-                    if nic.get('primary') is not None:
-                        nic['extra'] = {'primary': True}
-                    nics.update(nic)
-                    session.add(nics)
-                    session.flush()
-        return node
 
     def _do_update_network(self, network_id, values):
         with _session_for_write():
@@ -526,3 +563,68 @@ class Connection(api.Connection):
 
             ref.update(values)
         return ref
+
+    def _do_update_image(self, image_id, values):
+        with _session_for_write():
+            query = model_query(models.OSImage)
+            query = add_identity_filter(query, image_id)
+            try:
+                ref = query.with_lockmode('update').one()
+            except NoResultFound:
+                raise exception.ConductorNotExist(net=image_id)
+
+            ref.update(values)
+        return ref
+
+    def get_image_by_id(self, id):
+        query = model_query(models.OSImage)
+        query = query.filter_by(id=id)
+        try:
+            return query.one()
+        except NoResultFound:
+            raise exception.OSImageNotFound(image=id)
+
+    def get_image_by_name(self, name):
+        query = model_query(models.OSImage)
+        query = query.filter_by(name=name)
+        try:
+            return query.one()
+        except NoResultFound:
+            raise exception.OSImageNotFound(image=name)
+
+    def get_image_list(self, filters=None, limit=None, sort_key=None,
+                       sort_dir=None):
+        query = model_query(models.OSImage)
+        return _paginate_query(models.OSImage, limit, sort_key, sort_dir,
+                               query)
+
+    def create_image(self, values):
+        image = models.OSImage()
+        image.update(values)
+        with _session_for_write() as session:
+            try:
+                session.add(image)
+                session.flush()
+            except db_exc.DBDuplicateEntry as exc:
+                raise exception.OSImageAlreadyExists(name=values['name'])
+            return image
+
+    def destroy_image(self, name):
+        with _session_for_write():
+            query = model_query(models.OSImage)
+            query = query.filter_by(name=name)
+
+            try:
+                image = query.one()
+            except NoResultFound:
+                raise exception.OSImageNotFound(image=name)
+            query.delete()
+
+    def update_image(self, osimage_id, values):
+        try:
+            return self._do_update_image(osimage_id, values)
+        except db_exc.DBDuplicateEntry as e:
+            if 'name' in e.columns:
+                raise exception.DuplicateName(net=values['name'])
+            else:
+                raise

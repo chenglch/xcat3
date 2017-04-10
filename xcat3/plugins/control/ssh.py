@@ -1,3 +1,4 @@
+# coding=utf-8
 # Copyright 2013 Hewlett-Packard Development Company, L.P.
 # All Rights Reserved.
 #
@@ -14,7 +15,6 @@
 #    under the License.
 
 """
-Ironic SSH power manager.
 
 Provides basic power control of virtual machines via SSH.
 
@@ -123,10 +123,6 @@ def _get_command_sets(virt_type):
     get_boot_device / set_boot_device: Gets or sets the primary boot device
     """
     if virt_type == "virsh":
-        # NOTE(NobodyCam): changes to the virsh commands will impact CI
-        #                  see https://review.openstack.org/83906
-        #                  Change-Id: I160e4202952b7551b855dc7d91784d6a184cb0ed
-        #                  for more detail.
         virsh_cmds = {
             'base_cmd': 'LC_ALL=C /usr/bin/virsh',
             'start_cmd': 'start {_NodeName_}',

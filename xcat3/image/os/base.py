@@ -1,9 +1,13 @@
+# coding=utf-8
+
 import abc
 import errno
 import glob
 import inspect
 import os
+import select
 import six
+import six.moves.urllib.parse as urlparse
 import subprocess
 import time
 
@@ -11,8 +15,11 @@ from oslo_utils import importutils
 from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_service import loopingcall
+from oslo_utils import fileutils
+import shutil
 
 from xcat3.common.i18n import _
+from xcat3.common import client as http_client
 from xcat3.common import utils
 
 CONF = cfg.CONF
@@ -60,10 +67,10 @@ class Image(object):
                             "Exit code: %(return_code)s.\n"
                             "Stdout: %(stdout)r\n"
                             "Stderr: %(stderr)r") % {
-                                               'command': ' '.join(args),
-                                               'return_code': locals['returncode'],
-                                               'stdout': stdout,
-                                               'stderr': stderr}
+                               'command': ' '.join(args),
+                               'return_code': locals['returncode'],
+                               'stdout': stdout,
+                               'stderr': stderr}
                         LOG.warning(locals['errstr'])
                         raise loopingcall.LoopingCallDone()
 
@@ -91,12 +98,14 @@ class Image(object):
                   'mnt_dir': self.mnt_dir, 'dist_path': dist_path}
         process_find = subprocess.Popen(args1, stdout=subprocess.PIPE,
                                         shell=False)
+        # check the find output
+        while not select.select([process_find.stdout, ], [], [], 0.5)[0]:
+            pass
         process_cpio = subprocess.Popen(args2, stdin=process_find.stdout,
                                         stdout=utils.DEVNULL,
                                         stderr=utils.DEVNULL,
                                         shell=False)
         locals = {'returncode': None, 'errstr': ''}
-
         try:
             _wait(process_cpio, args2, 300)
         except loopingcall.LoopingCallDone:
@@ -107,6 +116,19 @@ class Image(object):
 
         os.chdir(cur_dir)
 
+    def _copy_netboot_initrd(self, dist_path, disk_info):
+        pass
+
+    def _copy_tftp(self, dist_path, disk_info):
+        dist_name = "%s%s" % (disk_info['product'], disk_info['version'])
+        install_kernel = os.path.join(dist_path, 'install', 'vmlinuz')
+        tftp_dir = os.path.join(CONF.deploy.tftp_dir, 'images', dist_name,
+                                disk_info['arch'])
+        fileutils.ensure_tree(tftp_dir)
+        shutil.copy(install_kernel, tftp_dir)
+        self._copy_netboot_initrd(dist_path, disk_info)
+
+
     @abc.abstractmethod
     def parse_info(self):
         """Parse the product version and arch information"""
@@ -114,3 +136,22 @@ class Image(object):
     @abc.abstractmethod
     def copycd(self, disk_info):
         """Create netboot image at install directory"""
+
+    def upload(self, disk_info):
+        print 'Uploading image information...'
+        dist_name = "%s%s" % (disk_info['product'], disk_info['version'])
+        client = http_client.HttpClient()
+        url = utils.get_api_url()
+        headers = {'Content-Type': 'application/json'}
+        image_url = urlparse.urljoin(url, 'osimages')
+        data = {"name": "%s-%s" % (dist_name, disk_info['arch']),
+                "arch": disk_info['arch'],
+                "ver": disk_info['version'],
+                "distro": disk_info['product']}
+        # delete the image if exists
+        try:
+            client.delete(urlparse.urljoin(url, 'osimages/%s' % dist_name),
+                          headers=headers)
+        except Exception:
+            pass
+        client.post(image_url, headers=headers, body=data)

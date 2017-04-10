@@ -10,7 +10,8 @@ LOG = logging.getLogger(__name__)
 
 
 class HttpClient(object):
-    def __init__(self, insecure=False, http_log_debug=False, cacert=None):
+    def __init__(self, insecure=False, http_log_debug=False, cacert=None,
+                 timings=False):
         self.session = requests.Session()
         self.http_log_debug = http_log_debug
         if insecure:
@@ -20,6 +21,8 @@ class HttpClient(object):
                 self.verify_cert = cacert
             else:
                 self.verify_cert = True
+        self.times = []  # [("item", starttime, endtime), ...]
+        self.timings = timings
 
     def http_log_req(self, method, url, kwargs):
         string_parts = ['curl -g -i']
@@ -27,12 +30,11 @@ class HttpClient(object):
         if not kwargs.get('verify', True):
             string_parts.append(' --insecure')
 
-        string_parts.append(" '%s'" % url)
+        string_parts.append(url)
         string_parts.append(' -X %s' % method)
 
         headers = copy.deepcopy(kwargs['headers'])
         string_parts.append(' -H %s' % headers)
-        string_parts.append(" '%s'" % url)
 
         if 'data' in kwargs:
             data = json.loads(kwargs['data'])
@@ -57,24 +59,20 @@ class HttpClient(object):
                                           'headers': resp.headers,
                                           'text': json.dumps(body)})
 
-    def request(self, method, url, **kwargs):
+    def request(self, url, method, **kwargs):
         kwargs.setdefault('headers', kwargs.get('headers', {}))
-        kwargs['headers']['User-Agent'] = self.USER_AGENT
         kwargs['headers']['Accept'] = 'application/json'
         if 'body' in kwargs:
             kwargs['headers']['Content-Type'] = 'application/json'
-            kwargs['data'] = json.dumps(kwargs.pop('body'))
+            body = kwargs.pop('body')
+            if body:
+                kwargs['data'] = json.dumps(body)
         kwargs['verify'] = self.verify_cert
         self.http_log_req(method, url, kwargs)
 
-        request_func = requests.request
-        if self.session.session:
-            request_func = self.session.request
+        request_func = self.session.request
 
-        resp = request_func(
-            method,
-            url,
-            **kwargs)
+        resp = request_func(method, url, **kwargs)
 
         self.http_log_resp(resp)
 

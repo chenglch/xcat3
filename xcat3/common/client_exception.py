@@ -42,10 +42,9 @@ class ClientException(Exception):
     """
     message = 'Unknown Error'
 
-    def __init__(self, code, message=None, details=None, url=None, method=None):
+    def __init__(self, code, message=None, url=None, method=None):
         self.code = code
         self.message = message or self.__class__.message
-        self.details = details
         self.url = url
         self.method = method
 
@@ -197,28 +196,7 @@ def from_response(response, body, url, method=None):
             kwargs['retry_after'] = response.headers.get('retry-after')
 
     if body:
-        message = "n/a"
-        details = "n/a"
-
-        if hasattr(body, 'keys'):
-            # NOTE(mriedem): WebOb<1.6.0 will return a nested dict structure
-            # where the error keys to the message/details/code. WebOb>=1.6.0
-            # returns just a response body as a single dict, not nested,
-            # so we have to handle both cases (since we can't trust what we're
-            # given with content_type: application/json either way.
-            if 'message' in body:
-                # WebOb 1.6.0 case
-                message = body.get('message')
-                details = body.get('details')
-            else:
-                # WebOb<1.6.0 where we assume there is a single error message
-                # key to the body that has the message and details.
-                error = body[list(body)[0]]
-                message = error.get('message')
-                details = error.get('details')
-
-        kwargs['message'] = message
-        kwargs['details'] = details
+        kwargs['message'] = str(body)
 
     return cls(**kwargs)
 

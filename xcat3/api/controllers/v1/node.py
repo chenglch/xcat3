@@ -14,18 +14,23 @@
 #    under the License.
 
 import datetime
-
+import futurist
 import pecan
 from oslo_log import log
+from oslo_concurrency import processutils
 from pecan import rest
 from xcat3.api import expose
+from xcat3.db import api as db_api
 import xcat3.conf
+import six
 from six.moves import http_client
 from xcat3.common import exception
+from xcat3.common import utils
+from xcat3.common import states
 from xcat3.api.controllers.v1 import types
 import wsme
 from wsme import types as wtypes
-
+from xcat3.common.i18n import _, _LE, _LI, _LW
 from xcat3.api.controllers import base
 from xcat3.api.controllers import link
 from xcat3.api.controllers.v1 import collection
@@ -39,56 +44,31 @@ LOG = log.getLogger(__name__)
 
 _DEFAULT_RETURN_FIELDS = ('name', 'reservation', 'created_at', 'nics_info',
                           'state', 'task_action', 'type', 'arch', 'mgt',
-                          'updated_at')
-
+                          'updated_at', 'id')
+_UNSET_NODE_FIELDS = ('id', 'created_at', 'updated_at')
 _REST_RESOURCE = ('power', 'provision', 'boot_device')
 
 ALLOWED_TARGET_POWER_STATES = (xcat3_states.POWER_ON,
-                               xcat3_states.POWER_OFF,
-                               xcat3_states.REBOOT,
-                               xcat3_states.SOFT_REBOOT,
-                               xcat3_states.SOFT_POWER_OFF)
+                               xcat3_states.POWER_OFF)
+
+dbapi = db_api.get_instance()
 
 
-def _bulk_local_wrap(func, nodes, *args, **kwargs):
-    """Call the function for each node one by one
-
-    :param func: the function called for each node
-    :param nodes: a list of API nodes
-    :return: json type result
-    """
-    result = dict()
-    result['nodes'] = dict()
-    result['success'] = 0
-    result['error'] = 0
-    nodes = nodes.nodes
-    for node in nodes:
-        node_name = api_utils.get_node_name(node)
-        try:
-            func(node)
-        except Exception as e:
-            result['nodes'][node_name] = e.message
-            result['error'] += 1
-        else:
-            result['success'] += 1
-            result['nodes'][node_name] = 'ok'
-    return types.JsonType.validate(result)
-
-
-def _wait_rpc_result(futures, names):
+def _wait_rpc_result(futures, names, result):
     """Wait the result from rpc call.
 
 
     :param futures: api worker objects
     :param nodes: node list for rpc request
+    :param result: node dict for the result
     :return: json type result
     """
     done, not_done = pecan.request.rpcapi.wait_workers(futures,
                                                        CONF.api.timeout)
     msg = "Timeout after waiting %(timeout)d seconds" % {
         "timeout": CONF.api.timeout}
-    result = dict()
-    result['nodes'] = dict((name, msg) for name in names)
+    for name in names:
+        result['nodes'][name] = msg
     for r in done:
         nodes = getattr(r, 'nodes', None)
         if r.exception():
@@ -107,18 +87,44 @@ def _wait_rpc_result(futures, names):
     return types.JsonType.validate(result)
 
 
+def _filter_unavailable_nodes(names):
+    """Exclude the non-exist nodes or locked nodes.
+
+        :param names: nodes names
+        :return: json type result, list of nodes names
+    """
+
+    result = dict()
+    msg = _("Could not be found.")
+    exist_names =  dbapi.get_node_in(names, fields=['name',])
+    exist_names = [name[0] for name in exist_names]
+    result['nodes'] = dict(
+        (name, msg) for name in names if name not in exist_names)
+    names = exist_names
+    msg = _("Locked temporarily")
+    locked_names = dbapi.get_node_in(names, filters=['not_reservation', ],
+                                  fields=['name', ])
+    locked_names = [name[0] for name in locked_names]
+    for name in locked_names:
+        result['nodes'][name] = msg
+    names = filter(lambda n: n not in locked_names, names)
+    return result, names
+
+
 class Node(base.APIBase):
     """API representation of a bare metal node.
 
     This class enforces type checking and value constraints, and converts
     between the internal object model and the API representation of a node.
     """
+    id = wsme.wsattr(int, readonly=True)
     name = wsme.wsattr(wtypes.text, mandatory=True)
     """The logical name for this node"""
     reservation = wsme.wsattr(wtypes.text, readonly=True)
     """The hostname of the conductor that holds an exclusive lock on
     the node."""
     mgt = wsme.wsattr(wtypes.text)
+    netboot = wsme.wsattr(wtypes.text)
     type = wsme.wsattr(wtypes.text)
     arch = wsme.wsattr(wtypes.text)
     osimage_name = wsme.wsattr(wtypes.text)
@@ -139,29 +145,7 @@ class Node(base.APIBase):
     @staticmethod
     def convert_with_links(node, fields=None):
         node = Node(**node.as_dict())
-        node_name = node.name
-        if fields is not None:
-            node.unset_fields_except(fields)
-
-        node.ports = [link.Link.make_link('self', pecan.request.public_url,
-                                          'nodes',
-                                          node_name + "/nics"),
-                      link.Link.make_link('bookmark', pecan.request.public_url,
-                                          'nodes',
-                                          node_name + "/nics",
-                                          bookmark=True)
-                      ]
-
-        node.links = [link.Link.make_link('self',
-                                          pecan.request.public_url,
-                                          'nodes',
-                                          node_name),
-                      link.Link.make_link('bookmark',
-                                          pecan.request.public_url,
-                                          'nodes',
-                                          node_name,
-                                          bookmark=True)
-                      ]
+        node.filter_fields(fields, _UNSET_NODE_FIELDS)
         return node
 
     @classmethod
@@ -202,6 +186,11 @@ class NodeCollection(collection.Collection):
     @staticmethod
     def convert_with_links(nodes, limit=50, url=None, fields=None, **kwargs):
         collection = NodeCollection()
+        if fields and len(fields) == 1 and 'nics' in fields:
+            fields = None
+        elif 'nics' in fields:
+            fields.remove('nics')
+            fields.append('nics_info')
         collection.nodes = [Node.convert_with_links(n, fields=fields)
                             for n in nodes]
         collection.next = collection.get_next(limit, url=url, **kwargs)
@@ -216,12 +205,11 @@ class NodeCollection(collection.Collection):
 
 
 class NodeProvisionController(rest.RestController):
-
     @expose.expose(types.jsontype, wtypes.text,
-                   wtypes.text,
+                   wtypes.text, wtypes.text,
                    body=NodeCollection,
                    status_code=http_client.ACCEPTED)
-    def put(self, target, nodes):
+    def put(self, target, osimage, nodes):
         """Set the provision state of the nodes.
 
         :param target: The desired  state of the node.
@@ -235,13 +223,15 @@ class NodeProvisionController(rest.RestController):
 
         """
         names = [node.name for node in nodes.nodes if node.name]
+        result, names = _filter_unavailable_nodes(names)
+        if not names:
+            return result
         futures = pecan.request.rpcapi.provision(pecan.request.context, names,
-                                                 target=target)
-        result = _wait_rpc_result(futures, names)
+                                                 target=target,
+                                                 osimage=osimage)
+        result = _wait_rpc_result(futures, names, result)
         url_args = '/'.join('states')
         pecan.response.location = link.build_url('nodes', url_args)
-        # result = pecan.request.dhcp_api.provision(pecan.request.context, names,
-        #                                           target=target)
         return result
 
 
@@ -258,9 +248,10 @@ class BootDeviceController(rest.RestController):
         :returns: json format about the status of nodes
         """
         names = [node.name for node in nodes.nodes if node.name]
+        result, names = _filter_unavailable_nodes(names)
         futures = pecan.request.rpcapi.set_boot_device(
             pecan.request.context, names, target)
-        result = _wait_rpc_result(futures, names)
+        result = _wait_rpc_result(futures, names, result)
         return result
 
     @expose.expose(types.jsontype, body=NodeCollection)
@@ -271,14 +262,14 @@ class BootDeviceController(rest.RestController):
         :returns: json format about the status of nodes
         """
         names = [node.name for node in nodes.nodes if node.name]
+        result, names = _filter_unavailable_nodes(names)
         futures = pecan.request.rpcapi.get_boot_device(
             pecan.request.context, names)
-        result = _wait_rpc_result(futures, names)
+        result = _wait_rpc_result(futures, names, result)
         return result
 
 
 class NodePowerController(rest.RestController):
-
     @expose.expose(types.jsontype, body=NodeCollection)
     def get(self, nodes):
         """List the states of the node.
@@ -286,9 +277,10 @@ class NodePowerController(rest.RestController):
         :param node_name: The name of a node.
         """
         names = [node.name for node in nodes.nodes if node.name]
+        result, names = _filter_unavailable_nodes(names)
         futures = pecan.request.rpcapi.get_power_state(
             pecan.request.context, names)
-        result = _wait_rpc_result(futures, names)
+        result = _wait_rpc_result(futures, names, result)
         return result
 
     @expose.expose(types.jsontype, wtypes.text,
@@ -309,15 +301,11 @@ class NodePowerController(rest.RestController):
         :raises: Invalid (HTTP 400) if timeout value is less than 1.
 
         """
-        # node = Node.get_api_node(node_ident)
-        # node_obj = api_utils.get_node_obj(node)
-        if (target in [xcat3_states.SOFT_REBOOT, xcat3_states.SOFT_POWER_OFF]):
-            raise exception.NotAcceptable()
         names = [node.name for node in nodes.nodes if node.name]
-
+        result, names = _filter_unavailable_nodes(names)
         futures = pecan.request.rpcapi.change_power_state(
             pecan.request.context, names, target=target)
-        result = _wait_rpc_result(futures, names)
+        result = _wait_rpc_result(futures, names, result)
         url_args = '/'.join('states')
         pecan.response.location = link.build_url('nodes', url_args)
         return result
@@ -327,7 +315,11 @@ class NodesController(rest.RestController):
     power = NodePowerController()
     provision = NodeProvisionController()
     boot_device = BootDeviceController()
-    invalid_sort_key_list = ['name']
+    invalid_sort_key_list = ['console_info', 'control_info', 'nics']
+
+    _custom_actions = {
+        'info': ['GET']
+    }
 
     def _check_names_acceptable(self, names, error_msg):
         """Checks all node 'name's are acceptable, it does not return a value.
@@ -345,19 +337,12 @@ class NodesController(rest.RestController):
                     error_msg % {'name': name},
                     status_code=http_client.BAD_REQUEST)
 
-    def _create(self, node):
-        context = pecan.request.context
-        if node.name in _REST_RESOURCE:
-            raise exception.InvalidName(name=node.name)
-        new_node = objects.Node(context, **node.as_dict())
-        new_node.create()
-
     def _delete(self, node):
         node_obj = api_utils.get_node_obj(node)
         node_obj.destroy()
 
-    def _get_nodes_collection(self, limit=1000, sort_key='id', sort_dir='asc',
-                              fields=None):
+    def _get_nodes_collection(self, names, limit=None, sort_key='id',
+                              sort_dir='asc', fields=None):
 
         limit = api_utils.validate_limit(limit)
         sort_dir = api_utils.validate_sort_dir(sort_dir)
@@ -366,10 +351,9 @@ class NodesController(rest.RestController):
             raise exception.InvalidParameterValue(
                 _("The sort_key value %(key)s is an invalid field for "
                   "sorting") % {'key': sort_key})
-        filters = {}
-        nodes = objects.Node.list(pecan.request.context, limit,
-                                  sort_key=sort_key, sort_dir=sort_dir,
-                                  filters=filters, fields=None)
+
+        nodes = objects.Node.list_in(pecan.request.context, names,
+                                     obj_info=fields)
 
         parameters = {'sort_key': sort_key, 'sort_dir': sort_dir}
         return NodeCollection.convert_with_links(nodes, limit,
@@ -390,16 +374,22 @@ class NodesController(rest.RestController):
             if node_obj[field] != patch_val:
                 node_obj[field] = patch_val
 
+    @expose.expose(NodeCollection, types.listtype, body=NodeCollection)
+    def info(self, fields=None, nodes=None):
+        if not fields:
+            fields = ['nics',]
+        names = [node.name for node in nodes.nodes if node.name]
+        return self._get_nodes_collection(names, limit=None, fields=fields)
+
     @expose.expose(Node, types.name, types.listtype)
     def get_one(self, node_name, fields=None):
         node = Node.get_api_node(node_name)
         node_obj = api_utils.get_node_obj(node)
         return Node.convert_with_links(node_obj, fields=fields)
 
-    @expose.expose(NodeCollection, int, wtypes.text, wtypes.text, wtypes.text,
+    @expose.expose(types.jsontype, int, wtypes.text, wtypes.text, wtypes.text,
                    types.listtype)
-    def get_all(self, limit=None, sort_key='id', sort_dir='asc',
-                fields=None):
+    def get_all(self, limit=None, sort_key='id', sort_dir='asc'):
         """Retrieve a list of nodes.
 
         :param limit: maximum number of resources to return in a single result.
@@ -411,10 +401,13 @@ class NodesController(rest.RestController):
         :param fields: Optional, a list with a specified set of fields
                        of the resource to be returned.
         """
-        if fields is None:
-            fields = ['name']
-        return self._get_nodes_collection(limit, sort_key, sort_dir,
-                                          fields=fields)
+        fields = ['name', ]
+        db_nodes = dbapi.get_node_list(limit=limit, sort_key=sort_key,
+                                       sort_dir=sort_dir, fields=fields)
+        results = {'nodes': []}
+        for node in db_nodes:
+            results['nodes'].append(node[0])
+        return results
 
     @expose.expose(types.jsontype, body=NodeCollection,
                    status_code=http_client.CREATED)
@@ -423,7 +416,61 @@ class NodesController(rest.RestController):
 
         :param nodes: Nodes with the request
         """
-        return _bulk_local_wrap(self._create, nodes)
+
+        def _create_object(node, result):
+            try:
+                context = pecan.request.context
+                if node.name in _REST_RESOURCE:
+                    raise exception.InvalidName(name=node.name)
+                new_node = objects.Node(context, **node.as_dict())
+            except Exception as e:
+                result['nodes'][node.name] = e.message
+            else:
+                result['nodes'][node.name] = states.SUCCESS
+            return new_node
+
+        def singal_create(nodes, result):
+            for node in nodes:
+                new_node = _create_object(node, result)
+                try:
+                    new_node.create()
+                except Exception as e:
+                    result['nodes'][node.name] = e.message
+                else:
+                    result['nodes'][node.name] = states.SUCCESS
+            return result
+
+        def bulk_create(nodes, result):
+            """Call the function for each node one by one
+
+            :param func: the function called for each node
+            :param nodes: a list of API nodes
+            :return: json type result
+            """
+            names = [node.name for node in nodes]
+            exist_names = dbapi.get_node_list(names, fields=['name', ])
+            exist_names = [name[0] for name in exist_names]
+            dups = utils.get_duplicate_list(names + exist_names)
+            msg = _("Error: duplicate name")
+            for item in dups:
+                result['nodes'][item] = msg
+            nodes = filter(lambda x: x.name not in dups, nodes)
+            new_nodes = []
+            for node in nodes:
+                new_node = _create_object(node, result)
+                new_nodes.append(new_node)
+            if new_nodes:
+                objects.Node.create_nodes(new_nodes)
+            return result
+
+        result = dict()
+        result['nodes'] = dict()
+        nodes = nodes.nodes
+        if len(nodes) < 15:
+            result = singal_create(nodes, result)
+        else:
+            result = bulk_create(nodes, result)
+        return types.JsonType.validate(result)
 
     @expose.expose(types.jsontype, body=NodeCollection,
                    status_code=http_client.ACCEPTED)
@@ -438,37 +485,46 @@ class NodesController(rest.RestController):
         """
 
         names = [node.name for node in nodes.nodes if node.name]
+        result, names = _filter_unavailable_nodes(names)
+        if not names:
+            return types.JsonType.validate(result)
         # As node may be used by other request, try to acquire lock then
         # delete nodes
         futures = pecan.request.rpcapi.destroy_nodes(
             pecan.request.context, names)
 
-        result = _wait_rpc_result(futures, names)
+        result = _wait_rpc_result(futures, names, result)
         return types.JsonType.validate(result)
 
-    @expose.expose(Node, types.name, body=[NodePatchType])
-    def patch(self, node_name, patch):
+    @expose.expose(types.jsontype, body=types.jsontype)
+    def patch(self, patch_dict):
         """Update an existing node.
 
         :param node_name: The name of a node.
         :param patch: a json PATCH document to apply to this node.
         :return: json format api node
         """
-        node = Node.get_api_node(node_name)
-        node_obj = api_utils.get_node_obj(node)
-        names = api_utils.get_patch_values(patch, '/name')
-        if len(names):
-            error_msg = (_("Node %s: Cannot change name to invalid name ")
-                         % node_name)
-            error_msg += "'%(name)s'"
-            self._check_names_acceptable(names, error_msg)
+        nodes = patch_dict['nodes']
+        patches = patch_dict['patches']
+
+        for patch in patches:
+            patch = NodePatchType(**patch)
+
+        names = [node['name'] for node in nodes if node.has_key('name')]
+        result, names = _filter_unavailable_nodes(names)
         try:
-            node_dict = node_obj.as_dict()
-            node = Node(**api_utils.apply_jsonpatch(node_dict, patch))
-        except api_utils.JSONPATCH_EXCEPTIONS as e:
-            raise exception.PatchError(patch=patch, reason=e)
-        self._update_changed_fields(node, node_obj)
-        # delta = node_obj.obj_what_changed()
-        node_obj.save()
-        api_node = Node.convert_with_links(node_obj)
-        return api_node
+            objs = objects.Node.list_in(pecan.request.context, names)
+            new_objs = []
+            for obj in objs:
+                api_obj = Node(
+                    **api_utils.apply_jsonpatch(obj.as_dict(), patches))
+                self._update_changed_fields(api_obj, obj)
+                new_objs.append(obj)
+            objects.Node.update_nodes(new_objs)
+            for name in names:
+                result['nodes'][name] = states.UPDATED
+        except Exception() as e:
+            for name in names:
+                result['nodes'][name] = e.message
+
+        return result
