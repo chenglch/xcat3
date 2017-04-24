@@ -95,155 +95,130 @@ Start xcat3 service
   python /usr/local/bin/xcat3-api --config-file etc/xcat3/xcat3.conf.sample &
   python /usr/local/bin/xcat3-conductor --config-file etc/xcat3/xcat3.conf.sample &
 
-Test Example
-============
+Command Line  Test Example
+==========================
 
-Command Line Command
---------------------
+For command usage, please see the reference
+`python-xcat3client <https://github.com/chenglch/python-xcat3client>`_
 
-Please reference `python-xcat3client <https://github.com/chenglch/python-xcat3client>`_
+All the result is from the all in one environment of x86_64 virtual machine
+with 6G memory and 4 CPU cores. We can adjust the value of worker number(both
+api worker and conductor worker) to improve the performance.
 
-
-Rest API Example(Deprecated)
-----------------------------
-
-Create Node
+Create Nodes
+------------
+Create 9998 nodes like the following definition
 ::
 
-  curl -XPOST 'http://localhost:3010/v1/nodes' -H Content-Type:application/json  -d '{"nodes":[{"name":"test_xcat3", "nics_info": {"nics":[{"ip": "12.0.0.0", "mac": "42:87:0a:05:65:0", "type": "primary"}, {"ip": "13.0.0.0", "mac": "43:87:0a:05:65:0"}] } }]}'
-
-  {
-    "error": 0,
-    "success": 1,
-    "nodes": {
-        "test_xcat3": "ok"
-    }
-  }
-  curl -XPOST 'http://localhost:3010/v1/nodes' -H Content-Type:application/json  -d '{"nodes":[{"name":"test_xcat4"}, {"name":"test_xcat5"}]}' | jq .
-  {
-    "error": 0,
-    "success": 2,
-    "nodes": {
-        "test_xcat4": "ok",
-        "test_xcat5": "ok"
-    }
-  }
-
-List Nodes
-::
-
-  curl -XGET 'http://localhost:3010/v1/nodes' -H Content-Type:application/json  | jq .
-  {
-    "nodes": [
-        {
-            "name": "test_xcat3"
-        },
-        {
-            "name": "test_xcat4"
-        },
-        {
-            "name": "test_xcat5"
+  root@c910f04x40k26:~/data# xcat3 show node9991
+  [
+    {
+        "node": "node9991",
+        "attr": {
+            "name": "node9991",
+            "reservation": null,
+            "mgt": "ipmi",
+            "netboot": "pxe",
+            "type": null,
+            "arch": "ppc64le",
+            "control_info": {
+                "bmc_address": "11.0.39.7",
+                "bmc_password": "password",
+                "bmc_username": "admin"
+            },
+            "console_info": {},
+            "nics_info": {
+                "nics": [
+                    {
+                        "uuid": "f8df6034-cd09-48b0-a864-116e3da1583a",
+                        "name": "eth0",
+                        "mac": "42:87:0a:05:27:07",
+                        "ip": "12.0.39.7",
+                        "extra": {
+                            "primary": true
+                        }
+                    },
+                    {
+                        "uuid": "134447a7-a8ab-4f9b-9d30-833f41ee0cbe",
+                        "name": "eth1",
+                        "mac": "43:87:0a:05:27:07",
+                        "ip": "13.0.39.7",
+                        "extra": {}
+                    }
+                ]
+            }
         }
-    ]
-  }
-
-Show Node
-::
-
-  curl -XGET 'http://localhost:3010/v1/nodes/test_xcat3' -H Content-Type:application/json  | jq .
-  {
-    "nics_info": {
-        "nics": [
-            {
-                "extra": {},
-                "uuid": "153c7c44-cd55-468c-a8d6-2963451c47d9",
-                "mac": "42:87:0a:05:65:0"
-            },
-            {
-                "extra": {},
-                "uuid": "15f30064-1a6d-462c-8e0f-f384e5afd48c",
-                "mac": "43:87:0a:05:65:0"
-            }
-        ]
-    },
-    "type": null,
-    "console_info": {},
-    "name": "test_xcat3",
-    "arch": null,
-    "created_at": "2017-03-17T05:52:03+00:00",
-    "updated_at": null,
-    "control_info": {},
-    "mgt": null,
-    "reservation": null
-  }
-
-Modify Node
-::
-
-  curl -XPATCH 'http://localhost:3010/v1/nodes/test_xcat3' -H Content-Type:application/json -d '[{"op":"add", "path": "/arch", "value": "ppc64le"}, {"op":"add", "path": "/mgt", "value": "ipmi"}]' | jq .
-  {
-    "nics_info": {
-        "nics": [
-            {
-                "extra": {},
-                "uuid": "153c7c44-cd55-468c-a8d6-2963451c47d9",
-                "mac": "42:87:0a:05:65:0"
-            },
-            {
-                "extra": {},
-                "uuid": "15f30064-1a6d-462c-8e0f-f384e5afd48c",
-                "mac": "43:87:0a:05:65:0"
-            }
-        ]
-    },
-    "type": null,
-    "console_info": {},
-    "name": "test_xcat3",
-    "arch": "ppc64le",
-    "created_at": "2017-03-17T05:52:03+00:00",
-    "updated_at": "2017-03-17T06:01:47.203561+00:00",
-    "control_info": {},
-    "mgt": "ipmi",
-    "reservation": null
-  }
-
-Power on Nodes
-::
-
-  curl -XPUT 'http://localhost:3010/v1/nodes/power?target=on' -H Content-Type:application/json -d '{"nodes":[{"name":"test_xcat3"}, {"name":"test_xcat4"}]}' | jq .
-  {
-    "nodes": {
-        "test_xcat3": "ok",
-        "test_xcat4": "plugin for None could not been loaded."
     }
-  }
+  ]
 
-Get power status of nodes
+Import Nodes
+------------
+Import 9998 nodes with import command:
 ::
 
-  curl -XGET 'http://localhost:3010/v1/nodes/power' -H Content-Type:application/json -d '{"nodes":[{"name":"test_xcat3"}, {"name":"test_xcat4"}]}' | jq .
-  {
-    "nodes": {
-        "test_xcat3": "on",
-        "test_xcat4": "on"
-    }
-  }
+  time xcat3 import node9999.json (with pypy)
+  node1: ok
+  node2: ok
+  node3: ok
+  node4: ok
+  ……
+  node9997: ok
+  node9998: ok
+  Success: 9998  Total: 9998
+
+  real   	0m11.448s
+  user   	0m1.292s
+  sys    	0m0.148s
+
+It takes about 15 seconds with cpython to import about 10000 nodes, pypy
+sometimes has 40% performance improvement.
+
+
+Update Nodes
+------------
+Modify 9998 nodes with pypy
+::
+
+  time xcat3 update node[1-9999] control/bmc_username=Admin arch=x86_64 control/bmc_password=passw0rd
+  node1: updated
+  node10: updated
+  node100: updated
+  node1000: updated
+  node1001: updated
+  ……
+  node9997: updated
+  Success: 9998  Total: 9999
+
+  real   	0m8.258s
+  user   	0m0.672s
+  sys    	0m0.304s
+
+Export Nodes
+------------
+::
+
+  # time xcat3 export node[1-9999] -o /tmp/node9999.json
+  Export nodes data succefully.
+
+  real   	0m4.175s
+  user   	0m0.888s
+  sys    	0m0.080s
 
 Delete Nodes
+------------
+
+Delete 9998 nodes with pypy
 ::
 
-  curl -XDELETE 'http://localhost:3010/v1/nodes' -H Content-Type:application/json  -d '{"nodes":[{"name":"test_xcat3"}, {"name":"test_xcat4"}]}' | jq .
-  {
-    "nodes": {
-        "test_xcat3": "deleted",
-        "test_xcat4": "deleted"
-    }
-  }
+  time xcat3 delete node[1-9999]
+  node9999: Could not be found.
+  node1: deleted
+  node10: deleted
+  ……
 
-Performance Example
--------------------
-::
+  Success: 9998  Total: 9999
 
-  cd examples
-  python create_nodes.py 1000  # generated json for 1000 nodes
-  time ./node_time.sh 10  # run commands above 10 times for GET and PUT, 1 time for POST and DELETE
+  real   	0m3.253s
+  user   	0m0.384s
+  sys    	0m0.192s
+
