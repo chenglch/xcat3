@@ -48,7 +48,6 @@ class Network(base.APIBase):
     subnet = wsme.wsattr(types.iptype)
     netmask = wsme.wsattr(types.iptype)
     gateway = wsme.wsattr(types.iptype)
-    dhcpserver = wsme.wsattr(types.iptype)
     nameservers = wsme.wsattr(types.iptype)
     ntpservers = {wtypes.text: types.jsontype}
     dynamic_range = wsme.wsattr(wtypes.text)
@@ -179,6 +178,7 @@ class NetworkController(rest.RestController):
                     'network': str(network)})
         new_network = objects.Network(context, **network.as_dict())
         new_network.create()
+        pecan.request.network_api.broadcast(context)
         result = {'network': dict()}
         result['network'][network.name] = 'ok'
         return types.JsonType.validate(result)
@@ -192,6 +192,7 @@ class NetworkController(rest.RestController):
         context = pecan.request.context
         network_obj = objects.Network.get_by_name(context, name)
         network_obj.destroy(name)
+        pecan.request.network_api.broadcast(context)
 
     @expose.expose(Network, types.name, body=[NetworkPatchType])
     def patch(self, name, patch):
@@ -215,5 +216,6 @@ class NetworkController(rest.RestController):
             raise exception.PatchError(patch=patch, reason=e)
         self._update_changed_fields(network, network_obj)
         network_obj.save()
+        pecan.request.network_api.broadcast(context)
         api_network = Network.convert_with_links(network_obj)
         return api_network

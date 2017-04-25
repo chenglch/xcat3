@@ -30,10 +30,9 @@ class Network(base.XCAT3Object, object_base.VersionedObjectDictCompat):
     fields = {
         'id': object_fields.IntegerField(),
         'name': object_fields.StringField(nullable=False),
-        'subnet': object_fields.StringField(nullable=True),
-        'netmask': object_fields.StringField(nullable=True),
+        'subnet': object_fields.StringField(nullable=False),
+        'netmask': object_fields.StringField(nullable=False),
         'gateway': object_fields.StringField(nullable=True),
-        'dhcpserver': object_fields.StringField(nullable=True),
         'nameservers': object_fields.StringField(nullable=True),
         'ntpservers': object_fields.FlexibleDictField(nullable=True),
         'dynamic_range': object_fields.StringField(nullable=True),
@@ -63,9 +62,9 @@ class Network(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         return network
 
     @classmethod
-    def list(cls, context, limit=None, sort_key=None, sort_dir=None,
+    def list(cls, context=None, limit=None, sort_key=None, sort_dir=None,
              filters=None, fields=None):
-        """Return a list of Node objects.
+        """Return a list of Network objects.
 
         :param context: Security context.
         :param limit: maximum number of resources to return in a single result.

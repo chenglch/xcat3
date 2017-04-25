@@ -19,6 +19,7 @@
 """Utilities and helper functions."""
 
 import contextlib
+import collections
 import datetime
 import errno
 import jinja2
@@ -30,12 +31,17 @@ import shutil
 import six
 import tempfile
 import time
-import collections
+import pwd
+import psutil
+import signal
+import threading
+import grp
 
 from oslo_concurrency import processutils
 from oslo_log import log as logging
 from oslo_utils import netutils
 from oslo_utils import timeutils
+from oslo_service import loopingcall
 
 from xcat3.conf import CONF
 from xcat3.common import exception
@@ -465,3 +471,117 @@ def get_duplicate_list(elements):
     """
     return [item for item, count in collections.Counter(elements).items() if
             count > 1]
+
+
+def chown(path, user, group):
+    """Change the owner of path"""
+
+    if hasattr(shutil, 'chown'):
+        shutil.chown(user, group)
+        return
+
+    try:
+        uid = pwd.getpwnam(user).pw_uid
+        gid = grp.getgrnam(group).gr_gid
+        os.chown(path, uid, gid)
+    except Exception as e:
+        LOG.warning(_LE("Failed to chown path %(path)s to user %(user)s group "
+                        "%(group)s due to the %(err)s"),
+                    {'path': path, 'user': user, 'group': group,
+                     'err': str(e)})
+
+
+def wait_process(popen_obj, args, complete_func, expiration, locals):
+    """Wait process complete
+
+    :param popen_obj: subprocess object.
+    :param args: command of subprocess
+    :param complete_func: Can be None, which means wait return code of command.
+                          If not None, it should be a callable function
+                          indicate subprocess is started, usually it is usded
+                          for daemon subprocess.
+    :param expiration: wait time in secondes
+    :param locals: dict structure contains returncode and errstr.
+    """
+    expiration = time.time() + expiration
+
+    while True:
+        locals['returncode'] = popen_obj.poll()
+        if locals['returncode'] is not None:
+            if locals['returncode'] == 0:
+                raise loopingcall.LoopingCallDone()
+            else:
+                (stdout, stderr) = popen_obj.communicate()
+                locals['errstr'] = _(
+                    "Command: %(command)s.\n"
+                    "Exit code: %(return_code)s.\n"
+                    "Stdout: %(stdout)r\n"
+                    "Stderr: %(stderr)r") % {
+                                       'command': ' '.join(args),
+                                       'return_code': locals['returncode'],
+                                       'stdout': stdout,
+                                       'stderr': stderr}
+                LOG.warning(locals['errstr'])
+                raise loopingcall.LoopingCallDone()
+
+        if complete_func and complete_func():
+            raise loopingcall.LoopingCallDone()
+
+        if (time.time() > expiration):
+            locals['errstr'] = _(
+                "Timeout while waiting for command subprocess "
+                "%(args)s") % {'args': " ".join(args)}
+            LOG.warning(locals['errstr'])
+            raise loopingcall.LoopingCallDone()
+
+
+def kill_child_process(pid, expiration):
+    """Kill process until process is terminated completely
+
+    :param pid: The process id
+    :param expiration: wait time in seconds.
+    """
+    if psutil.pid_exists(pid):
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+
+        # wait for 5 seconds
+        expiration = time.time() + expiration
+        while True:
+            try:
+                ret, status = os.waitpid(pid, os.WNOHANG)
+            except OSError:
+                break
+
+            if ret == pid:
+                break
+            if time.time() > expiration:
+                os.kill(pid, signal.SIGKILL)
+
+
+def make_synchronized(func):
+    func.__lock__ = threading.Lock()
+
+    def synced_func(*args, **kwargs):
+        with func.__lock__:
+            return func(*args, **kwargs)
+
+    return synced_func
+
+
+def ensure_file(path):
+    if not os.path.exists(path):
+        open(path, 'w').close()
+
+
+def singleton(cls):
+    instances = {}
+
+    def _singleton(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+
+    return _singleton

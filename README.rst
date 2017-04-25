@@ -28,7 +28,7 @@ Pre-install steps
 
   apt-get update && apt-get install build-essential python-dev libssl-dev \
   python-pip libmysqlclient-dev libxml2-dev libxslt-dev libpq-dev libffi-dev \
-  gettext git rabbitmq-server mysql-server jq isc-dhcp-server
+  gettext git rabbitmq-server mysql-server jq isc-dhcp-server ntp
 
 Installation
 ============
@@ -94,6 +94,7 @@ Start xcat3 service
 
   python /usr/local/bin/xcat3-api --config-file etc/xcat3/xcat3.conf.sample &
   python /usr/local/bin/xcat3-conductor --config-file etc/xcat3/xcat3.conf.sample &
+  python /usr/local/bin/xcat3-network --config-file etc/xcat3/xcat3.conf.sample &
 
 Command Line  Test Example
 ==========================
@@ -222,3 +223,35 @@ Delete 9998 nodes with pypy
   user   	0m0.384s
   sys    	0m0.192s
 
+Update network configuration to enable dhcp service
+---------------------------------------------------
+
+::
+
+  # network
+  xcat3 network-create c920 subnet=10.0.0.0 netmask=255.0.0.0 gateway=10.0.0.103
+
+
+Make DHCP
+---------
+
+Generate dhcp configuration file for target nodes
+::
+
+  time xcat3 deploy node[0-9999] --state dhcp
+  ……
+  Success: 10000  Total: 10000
+
+  real   	0m19.485s
+  user   	0m0.165s
+  sys    	0m0.065s
+
+Clean up the dhcp or nodeset contents
+::
+
+  time xcat3 deploy node[0-9999] -d
+  Success: 10000  Total: 10000
+
+  real   	0m13.151s
+  user   	0m0.165s
+  sys    	0m0.065s

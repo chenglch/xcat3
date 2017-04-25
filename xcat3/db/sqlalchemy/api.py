@@ -17,9 +17,7 @@
 
 """SQLAlchemy storage backend."""
 
-import collections
 import datetime
-import six
 import threading
 
 from oslo_db import exception as db_exc
@@ -496,25 +494,31 @@ class Connection(api.Connection):
             else:
                 raise
 
-    def get_conductors(self, service='conductor'):
-        interval = CONF.conductor.heartbeat_timeout
-        limit = timeutils.utcnow() - datetime.timedelta(seconds=interval)
-        return (model_query(models.Conductor).filter(
-            models.Conductor.updated_at > limit,
-            models.Conductor.service == service).all())
+    def get_services(self, type='conductor', check_limit=True):
+        interval = CONF.heartbeat_timeout
+        if check_limit:
+            limit = timeutils.utcnow() - datetime.timedelta(seconds=interval)
+            return (model_query(models.Service).filter(
+                models.Service.updated_at > limit,
+                models.Service.type == type).all())
 
-    def register_conductor(self, values, update_existing=False):
+        query = model_query(models.Service)
+        if type:
+            query.filter_by(type=type)
+        return query.all()
+
+    def register_service(self, values, update_existing=False):
         with _session_for_write() as session:
-            query = (model_query(models.Conductor)
+            query = (model_query(models.Service)
                      .filter_by(hostname=values['hostname'],
-                                service=values['service']))
+                                type=values['type']))
             try:
                 ref = query.one()
                 if ref.online is True and not update_existing:
-                    raise exception.ConductorAlreadyRegistered(
-                        conductor=values['hostname'])
+                    raise exception.ServiceAlreadyRegistered(
+                        service=values['hostname'])
             except NoResultFound:
-                ref = models.Conductor()
+                ref = models.Service()
                 session.add(ref)
             ref.update(values)
             # always set online and updated_at fields when registering
@@ -523,34 +527,33 @@ class Connection(api.Connection):
                         'online': True})
         return ref
 
-    def get_conductor(self, hostname, service='conductor'):
+    def get_service(self, hostname):
         try:
-            return (model_query(models.Conductor)
-                    .filter_by(hostname=hostname, online=True, service=service)
-                    .one())
+            return (model_query(models.Service)
+                    .filter_by(hostname=hostname)
+                    .all())
         except NoResultFound:
-            raise exception.ConductorNotFound(conductor=hostname)
+            raise exception.ServiceNotFound(service=hostname)
 
-    def unregister_conductor(self, hostname, service='conductor'):
+    def unregister_service(self, hostname, type='conductor'):
         with _session_for_write():
-            query = (model_query(models.Conductor)
+            query = (model_query(models.Service)
                      .filter_by(hostname=hostname, online=True,
-                                service='conductor'))
+                                type=type))
             count = query.update({'online': False})
             if count == 0:
-                raise exception.ConductorNotFound(conductor=hostname)
+                raise exception.ServiceNotFound(service=hostname)
 
-    def touch_conductor(self, hostname, service='conductor'):
+    def touch_service(self, hostname, type):
         with _session_for_write():
-            query = (model_query(models.Conductor)
-                     .filter_by(hostname=hostname, service=service))
+            query = (model_query(models.Service)
+                     .filter_by(hostname=hostname, type=type))
             # since we're not changing any other field, manually set updated_at
             # and since we're heartbeating, make sure that online=True
             count = query.update({'updated_at': timeutils.utcnow(),
                                   'online': True})
             if count == 0:
-                raise exception.ConductorNotFound(conductor=hostname)
-
+                raise exception.ServiceNotFound(service=hostname)
 
     def _do_update_network(self, network_id, values):
         with _session_for_write():
@@ -559,7 +562,7 @@ class Connection(api.Connection):
             try:
                 ref = query.with_lockmode('update').one()
             except NoResultFound:
-                raise exception.ConductorNotExist(net=network_id)
+                raise exception.NetworkNotFound(net=network_id)
 
             ref.update(values)
         return ref
@@ -571,7 +574,7 @@ class Connection(api.Connection):
             try:
                 ref = query.with_lockmode('update').one()
             except NoResultFound:
-                raise exception.ConductorNotExist(net=image_id)
+                raise exception.OSImageNotFound(image=image_id)
 
             ref.update(values)
         return ref

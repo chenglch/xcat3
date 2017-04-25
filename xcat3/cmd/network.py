@@ -20,14 +20,14 @@ LOG = log.getLogger(__name__)
 
 
 def main():
-    assert 'xcat3.dhcp.manager' not in sys.modules
+    assert 'xcat3.network.manager' not in sys.modules
 
     # Parse config file and command line options, then start logging
     xcat3_service.prepare_service(sys.argv)
 
     mgr = rpc_service.RPCService(CONF.host,
-                                 'xcat3.dhcp.manager',
-                                 'ConductorManager')
+                                 'xcat3.network.manager',
+                                 'NetworkManager')
 
     launcher = service.launch(CONF, mgr)
     launcher.wait()

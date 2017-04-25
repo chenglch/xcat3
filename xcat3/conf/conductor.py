@@ -25,9 +25,6 @@ opts = [
                help=_('The size of the workers greenthread pool. '
                       'Note that 2 threads will be reserved by the conductor '
                       'itself for handling heart beats and periodic tasks.')),
-    cfg.IntOpt('heartbeat_interval',
-               default=10,
-               help=_('Seconds between conductor heart beats.')),
     cfg.StrOpt('api_url',
                regex='^http(s?):\/\/.+',
                help=_('URL of xcat3 API service. If not set xcat3 can '
@@ -40,11 +37,6 @@ opts = [
     cfg.IntOpt('node_locked_retry_interval',
                default=1,
                help=_('Seconds to sleep between node lock attempts.')),
-    cfg.IntOpt('heartbeat_timeout',
-               default=60,
-               help=_('Maximum time (in seconds) since the last check-in '
-                      'of a conductor. A conductor is considered inactive '
-                      'when this time has been exceeded.')),
     cfg.IntOpt('timeout',
                default=3660,
                help=_('Maximum time (in seconds) to process task in a worker'

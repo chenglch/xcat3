@@ -246,14 +246,14 @@ class Connection(object):
         """Update network"""
 
     @abc.abstractmethod
-    def get_conductors(self, service='conductor'):
+    def get_services(self, type='conductor'):
         """Return conductor nodes
 
         :returns: Conductor nodes
         """
 
     @abc.abstractmethod
-    def register_conductor(self, values, update_existing=False):
+    def register_service(self, values, update_existing=False):
         """Register conductor nodes"""
 
     @abc.abstractmethod

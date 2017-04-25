@@ -32,7 +32,7 @@ from xcat3 import objects
 from xcat3.common import states as xcat3_states
 from xcat3.common import ip_lib
 from xcat3.common.i18n import _, _LE, _LI, _LW
-from xcat3.dhcp import dhcp
+from xcat3.network import dhcp
 from xcat3.plugins import mapping
 
 MANAGER_TOPIC = 'xcat3.conductor_manager'
@@ -50,11 +50,16 @@ class ConductorManager(base_manager.BaseConductorManager):
     def __init__(self, host, topic):
         super(ConductorManager, self).__init__(host, topic)
 
-    def _fill_result(self, nodes, message=None):
-        result = {}
-        for node in nodes:
-            result[node.name] = message
-        return result
+    def _filter_result(self, result, nodes):
+        names = [name for name, val in six.iteritems(result) if
+                 val == xcat3_states.SUCCESS]
+        names_dict = dict((name, True) for name in names)
+        nodes = [node for node in nodes if names_dict.has_key(node.name)]
+        return names, nodes
+
+    def _fill_result(self, result, names, message):
+        for name in names:
+            result[name] = message
 
     def _process_nodes_worker(self, func, nodes, *args, **kwargs):
         """Wait the result from rpc call.
@@ -92,7 +97,7 @@ class ConductorManager(base_manager.BaseConductorManager):
         return result
 
     @messaging.expected_exceptions(exception.InvalidParameterValue,
-                                   exception.NoFreeConductorWorker,
+                                   exception.NoFreeServiceWorker,
                                    exception.NodeLocked)
     def change_power_state(self, context, names, target):
         """RPC method to encapsulate changes to a node's state.
@@ -100,7 +105,7 @@ class ConductorManager(base_manager.BaseConductorManager):
         :param context: an admin context.
         :param names: the names of nodes.
         :param target: the desired power state of the node.
-        :raises: NoFreeConductorWorker when there is no free worker to start
+        :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
         :raises: InvalidParameterValue
         :raises: MissingParameterValue
@@ -115,7 +120,7 @@ class ConductorManager(base_manager.BaseConductorManager):
             control_plugin.validate(node)
             control_plugin.set_power_state(node, target)
 
-        with task_manager.acquire(context, names, obj_info=['nics',],
+        with task_manager.acquire(context, names, obj_info=['nics', ],
                                   purpose='change power state') as task:
             result = self._process_nodes_worker(_change_power_state,
                                                 nodes=task.nodes,
@@ -123,14 +128,14 @@ class ConductorManager(base_manager.BaseConductorManager):
             return result
 
     @messaging.expected_exceptions(exception.InvalidParameterValue,
-                                   exception.NoFreeConductorWorker,
+                                   exception.NoFreeServiceWorker,
                                    exception.NodeLocked)
     def get_power_state(self, context, names):
         """RPC method to get a node's power state.
 
         :param context: an admin context.
         :param names: the names of nodes.
-        :raises: NoFreeConductorWorker when there is no free worker to start
+        :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
         :raises: InvalidParameterValue
         :raises: MissingParameterValue
@@ -145,21 +150,21 @@ class ConductorManager(base_manager.BaseConductorManager):
             return control_plugin.get_power_state(node)
 
         with task_manager.acquire(context, names, shared=True,
-                                  obj_info=['nics',],
+                                  obj_info=['nics', ],
                                   purpose='get power state') as task:
             result = self._process_nodes_worker(_get_power_state,
                                                 nodes=task.nodes)
             return result
 
     @messaging.expected_exceptions(exception.InvalidParameterValue,
-                                   exception.NoFreeConductorWorker,
+                                   exception.NoFreeServiceWorker,
                                    exception.NodeLocked)
     def destroy_nodes(self, context, names):
         """RPC method to destroy nodes.
 
         :param context: an admin context.
         :param names: the names of nodes.
-        :raises: NoFreeConductorWorker when there is no free worker to start
+        :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
         :raises: InvalidParameterValue
         :raises: MissingParameterValue
@@ -180,15 +185,15 @@ class ConductorManager(base_manager.BaseConductorManager):
             return result
 
     @messaging.expected_exceptions(exception.InvalidParameterValue,
-                                   exception.NoFreeConductorWorker,
+                                   exception.NoFreeServiceWorker,
                                    exception.NodeLocked)
-    def provision(self, context, names, target, osimage):
+    def provision(self, context, names, target, osimage, subnet=None):
         """RPC method to encapsulate changes to a node's state.
 
         :param context: an admin context.
         :param names: the names of nodes.
-        :param target: the desired power state of the node.
-        :raises: NoFreeConductorWorker when there is no free worker to start
+        :param target: the desired state of nodes.
+        :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
         :raises: InvalidParameterValue
         :raises: MissingParameterValue
@@ -198,36 +203,66 @@ class ConductorManager(base_manager.BaseConductorManager):
                  "The desired new state is %(target)s.",
                  {'nodes': str(names), 'target': target})
 
-        def _provision(node, target, osimage):
+        def _provision(node, osimage, dhcp_opts, subnet=None):
+
             boot_plugin = mapping.get_boot_plugin(node)
             boot_plugin.validate(node)
-            boot_plugin.prepare(node, osimage)
+            dhcp_opts[node.name].update(boot_plugin.gen_dhcp_opts(node))
+            if not osimage:
+                node.state = xcat3_states.DEPLOY_DHCP
+                return
 
-            # control_plugin, os_plugin, boot_plugin = mapping.get_plugin(node)
-            # control_plugin.validate(node)
-            # control_plugin.set_power_state(node, target)
+            node.state = xcat3_states.DEPLOY_NODESET
+            boot_plugin.nodeset(node, osimage)
+
+        def _clean(node):
+            boot_plugin = mapping.get_boot_plugin(node)
+            boot_plugin.clean(node)
+            node.state = xcat3_states.DEPLOY_NONE
+
 
         with task_manager.acquire(context, names, obj_info=['nics', ],
                                   purpose='nodes provision') as task:
-            osimage = objects.OSImage.get_by_name(context, osimage)
-            result = self._process_nodes_worker(_provision,
-                                                nodes=task.nodes,
-                                                target=target, osimage=osimage)
+            dhcp_opts = dict((name, {}) for name in names)
+            nodes = task.nodes
+            if target and target.startswith('un_'):
+                try:
+                    self.network_api.update_dhcp(context, 'remove', names,
+                                                 None)
+                    result = self._process_nodes_worker(_clean, nodes=nodes)
+                    objects.Node.update_nodes(nodes)
+                except Exception as e:
+                    result = dict()
+                    self._fill_result(result, names, e.message)
+                return result
 
-            # dhcp_topic = self.dhcp_api.get_topic_for()
-            # self.dhcp_api.provision(context, names, target=target)
+            if target == 'dhcp':
+                osimage = None
+
+            result = self._process_nodes_worker(_provision,
+                                                nodes=nodes,
+                                                osimage=osimage,
+                                                dhcp_opts=dhcp_opts,
+                                                subnet=subnet)
+            names, nodes = self._filter_result(result, nodes)
+            try:
+                self.network_api.update_dhcp(context, 'add', names, dhcp_opts,
+                                             subnet)
+                objects.Node.update_nodes(nodes)
+            except Exception as e:
+                self._fill_result(result, names, e.message)
 
             return result
 
     @messaging.expected_exceptions(exception.InvalidParameterValue,
-                                   exception.NoFreeConductorWorker,
+                                   exception.NoFreeServiceWorker,
                                    exception.NodeLocked)
     def get_boot_device(self, context, names):
         """RPC method to get the boot device of nodes.
 
         :param context: an admin context.
         :param names: the names of nodes.
-        :raises: NoFreeConductorWorker when there is no free worker to start
+        :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
         :raises: InvalidParameterValue
         :raises: MissingParameterValue
@@ -249,7 +284,7 @@ class ConductorManager(base_manager.BaseConductorManager):
             return result
 
     @messaging.expected_exceptions(exception.InvalidParameterValue,
-                                   exception.NoFreeConductorWorker,
+                                   exception.NoFreeServiceWorker,
                                    exception.NodeLocked)
     def set_boot_device(self, context, names, boot_device):
         """RPC method to get the boot device of nodes.
@@ -257,7 +292,7 @@ class ConductorManager(base_manager.BaseConductorManager):
         :param context: an admin context.
         :param names: the names of nodes.
         :param boot_device: the boot device target.
-        :raises: NoFreeConductorWorker when there is no free worker to start
+        :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
         :raises: InvalidParameterValue
         :raises: MissingParameterValue
@@ -272,7 +307,7 @@ class ConductorManager(base_manager.BaseConductorManager):
             control_plugin.validate(node)
             return control_plugin.set_boot_device(node, boot_device)
 
-        with task_manager.acquire(context, names, obj_info=['nics',],
+        with task_manager.acquire(context, names, obj_info=['nics', ],
                                   purpose='set boot device') as task:
             result = self._process_nodes_worker(_set_boot_device,
                                                 nodes=task.nodes,

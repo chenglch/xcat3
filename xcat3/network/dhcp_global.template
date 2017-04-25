@@ -17,6 +17,12 @@ option tcode "US/Eastern";
 option gpxe.no-pxedhcp 1;
 option www-server code 114 = string;
 
+omapi-port 7911;
+key xcat_key {
+  algorithm hmac-md5;
+  secret "{{ omapi_secret}}";
+};
+
 class "pxe" {
    match if substring (option vendor-class-identifier, 0, 9) = "PXEClient";
    ddns-updates off;

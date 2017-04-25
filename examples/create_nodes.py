@@ -7,7 +7,7 @@ def gen_data(n=10):
     names = {"nodes": []}
     num = [0, 0]
 
-    for i in xrange(n-1):
+    for i in xrange(n):
         d = dict()
         num[0] = i / 256
         num[1] = i % 256

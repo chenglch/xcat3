@@ -27,10 +27,20 @@ class BootInterface(base.BaseInterface):
         """
 
     @abc.abstractmethod
-    def prepare(self, node):
+    def gen_dhcp_opts(self, node):
         """Build the configuration file and prepare kernal and initrd
 
         :param node: the node to act on.
+        :returns dhcp_opts: dhcp option dict for this node
+        :raises: MissingParameterValue if a required parameter is missing.
+        """
+
+    @abc.abstractmethod
+    def nodeset(self, node, osimage):
+        """Build the configuration file and prepare kernal and initrd
+
+        :param node: the node to act on.
+        :param osimage: the os info create by copycds
         :raises: MissingParameterValue if a required parameter is missing.
         """
 

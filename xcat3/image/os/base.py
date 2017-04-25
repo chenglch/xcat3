@@ -52,35 +52,6 @@ class Image(object):
         self.name = name
 
     def _cpio(self, dist_path):
-
-        def _wait(popen_obj, args, expiration):
-            expiration = time.time() + expiration
-            while True:
-                locals['returncode'] = popen_obj.poll()
-                if locals['returncode'] is not None:
-                    if locals['returncode'] == 0:
-                        raise loopingcall.LoopingCallDone()
-                    else:
-                        (stdout, stderr) = popen_obj.communicate()
-                        locals['errstr'] = _(
-                            "Command: %(command)s.\n"
-                            "Exit code: %(return_code)s.\n"
-                            "Stdout: %(stdout)r\n"
-                            "Stderr: %(stderr)r") % {
-                               'command': ' '.join(args),
-                               'return_code': locals['returncode'],
-                               'stdout': stdout,
-                               'stderr': stderr}
-                        LOG.warning(locals['errstr'])
-                        raise loopingcall.LoopingCallDone()
-
-                if (time.time() > expiration):
-                    locals['errstr'] = _(
-                        "Timeout while waiting for command subprocess "
-                        "%(args)s") % {'args': " ".join(args)}
-                    LOG.warning(locals['errstr'])
-                    raise loopingcall.LoopingCallDone()
-
         try:
             os.makedirs(dist_path, 0755, )
         except OSError as exc:
@@ -107,7 +78,7 @@ class Image(object):
                                         shell=False)
         locals = {'returncode': None, 'errstr': ''}
         try:
-            _wait(process_cpio, args2, 300)
+            utils.wait_process(process_cpio, args2, None, 300, locals)
         except loopingcall.LoopingCallDone:
             pass
 
@@ -150,8 +121,8 @@ class Image(object):
                 "distro": disk_info['product']}
         # delete the image if exists
         try:
-            client.delete(urlparse.urljoin(url, 'osimages/%s' % dist_name),
-                          headers=headers)
+            client.delete(urlparse.urljoin(url, 'osimages/%s-%s' % (
+            dist_name, disk_info['arch'])), headers=headers)
         except Exception:
             pass
         client.post(image_url, headers=headers, body=data)

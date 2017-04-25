@@ -28,11 +28,17 @@ class IPWrapper(object):
             LOG.error(_LE("Failed to get network interfaces."))
             return []
 
-    def get_devices_in_network(self, network, netmask):
+    def get_devices_in_network(self, subnet, netmask):
         devices = []
         for ip_dev in self.get_devices():
-            if ip_dev.device_in_network(network, netmask):
-                devices.append(ip_dev)
+            try:
+                if ip_dev.device_in_network(subnet, netmask):
+                    devices.append(ip_dev)
+            except ValueError as e:
+                LOG.error(_LE(
+                    "Invalid value subnet %(subnet)s netmask %(netmask)s") % {
+                              'subnet': subnet, 'netmask': netmask})
+
         return devices
 
     def get_net_bits(self, netmask):

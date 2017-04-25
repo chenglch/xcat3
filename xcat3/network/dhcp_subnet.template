@@ -29,5 +29,8 @@ shared-network {{network.nic}} {
     } else if substring(filename,0,1) = null { #otherwise, provide yaboot if the client isn't specific
        filename "/yaboot";
     }
+    {% if network.dynamic_range %}
+    aa {{ network.dynamic_range }}
+    {% endif %}
   } # {{network.subnet}}/{{network.netmask}} subnet_end
 } # {{network.nic}} nic_end

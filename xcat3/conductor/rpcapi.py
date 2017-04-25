@@ -67,7 +67,7 @@ class ConductorAPI(object):
         exception. Execution control returns immediately to the caller.
         :param func: the function should be called within green thread
         :returns: Future object.
-        :raises: NoFreeConductorWorker if worker pool is currently full.
+        :raises: NoFreeServiceWorker if worker pool is currently full.
 
         """
 
@@ -126,7 +126,7 @@ class ConductorAPI(object):
         :raises: NoValidHost
 
         """
-        conductors = self.dbapi.get_conductors()
+        conductors = self.dbapi.get_services(type='conductor')
         if not conductors:
             reason = (_('No conductor service registered'))
             raise exception.NoValidHost(reason=reason)
@@ -158,7 +158,7 @@ class ConductorAPI(object):
         :param context: request context.
         :param names: names of nodes.
         :param target: desired power state
-        :raises: NoFreeConductorWorker when there is no free worker to start
+        :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
 
         """
@@ -186,7 +186,7 @@ class ConductorAPI(object):
 
         :param context: request context.
         :param names: names of nodes.
-        :raises: NoFreeConductorWorker when there is no free worker to start
+        :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
         """
 
@@ -211,7 +211,7 @@ class ConductorAPI(object):
 
         :param context: request context.
         :param names: names of nodes.
-        :raises: NoFreeConductorWorker when there is no free worker to start
+        :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
 
         """
@@ -229,7 +229,7 @@ class ConductorAPI(object):
 
         return futures
 
-    def provision(self, context, names, target, osimage):
+    def provision(self, context, names, target, osimage, subnet=None):
         """Change nodes's provision state.
 
         Synchronously, acquire lock and start the conductor background task
@@ -238,14 +238,14 @@ class ConductorAPI(object):
         :param context: request context.
         :param names: names of nodes.
         :param target: desired power state
-        :raises: NoFreeConductorWorker when there is no free worker to start
+        :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
 
         """
 
-        def _provision(cctxt, names, target, osimage):
+        def _provision(cctxt, names, target, osimage, subnet=None):
             return cctxt.call(context, 'provision', names=names,
-                              target=target, osimage=osimage)
+                              target=target, osimage=osimage, subnet=subnet)
 
         topic_dict = self.get_topic_for(names)
         futures = []
@@ -253,7 +253,8 @@ class ConductorAPI(object):
             cctxt = self.client.prepare(topic=topic or self.topic,
                                         version='1.0')
             temp = self.spawn_worker(_provision, cctxt, names=nodes,
-                                     target=target, osimage=osimage)
+                                     target=target, osimage=osimage,
+                                     subnet=subnet)
             futures.extend(temp)
 
         return futures
@@ -266,7 +267,7 @@ class ConductorAPI(object):
 
         :param context: request context.
         :param names: names of nodes.
-        :raises: NoFreeConductorWorker when there is no free worker to start
+        :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
         """
 
@@ -291,7 +292,7 @@ class ConductorAPI(object):
 
         :param context: request context.
         :param names: names of nodes.
-        :raises: NoFreeConductorWorker when there is no free worker to start
+        :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
         """
 

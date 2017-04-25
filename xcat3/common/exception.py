@@ -142,8 +142,8 @@ class NotAuthorized(XCAT3Exception):
     code = http_client.FORBIDDEN
 
 
-class ConductorAlreadyRegistered(XCAT3Exception):
-    _msg_fmt = _("Conductor %(conductor)s already registered.")
+class ServiceAlreadyRegistered(XCAT3Exception):
+    _msg_fmt = _("Service %(service)s already registered.")
 
 
 class Invalid(XCAT3Exception):
@@ -193,7 +193,11 @@ class NoValidHost(NotFound):
     _msg_fmt = _("No valid host was found. Reason: %(reason)s")
 
 
-class ConductorNotExist(NotFound):
+class ServiceNotFound(NotFound):
+    _msg_fmt = _("Service %(service)s could not be found.")
+
+
+class ServiceNotExist(NotFound):
     _msg_fmt = _("Could not find any conductor nodes")
 
 
@@ -275,9 +279,9 @@ class NoFreeAPIWorker(TemporaryFailure):
     code = http_client.SERVICE_UNAVAILABLE
 
 
-class NoFreeConductorWorker(TemporaryFailure):
+class NoFreeServiceWorker(TemporaryFailure):
     _msg_fmt = _('Requested action cannot be performed due to lack of free '
-                 'conductor workers.')
+                 'service workers.')
     code = http_client.SERVICE_UNAVAILABLE
 
 
@@ -324,3 +328,8 @@ class InvalidState(Conflict):
 
 class PowerStateFailure(InvalidState):
     _msg_fmt = _("Failed to set node power state to %(pstate)s.")
+
+
+class ThreadConflict(Conflict):
+    _msg_fmt = _(
+        "There is anonther thread is running for this job, exit %(thread)s.")

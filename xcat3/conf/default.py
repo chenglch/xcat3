@@ -38,8 +38,6 @@ api_opts = [
                        'and should not be used in a production environment.')),
 ]
 
-driver_opts = [
-]
 
 exc_log_opts = [
     cfg.BoolOpt('fatal_exception_format_errors',
@@ -75,12 +73,19 @@ utils_opts = [
                default=1,
                help=_('Time interval (in seconds) for checking the status of '
                       'subprocess.')),
+    cfg.IntOpt('heartbeat_timeout',
+               default=30,
+               help=_('Maximum time (in seconds) since the last check-in '
+                      'of a service. A service is considered inactive '
+                      'when this time has been exceeded.')),
+    cfg.IntOpt('heartbeat_interval',
+               default=10,
+               help=_('Seconds between service heart beats.')),
 ]
 
 
 def register_opts(conf):
     conf.register_opts(api_opts)
-    conf.register_opts(driver_opts)
     conf.register_opts(exc_log_opts)
     conf.register_opts(service_opts)
     conf.register_opts(utils_opts)

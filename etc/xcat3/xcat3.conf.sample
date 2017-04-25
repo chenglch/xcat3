@@ -2,7 +2,7 @@
 #
 # From xcat3
 #
-rpc_backend = rabbit
+#rpc_backend = rabbit
 #log_dir = /var/log/xcat3
 rpc_response_timeout = 3600
 transport_url = rabbit://xcat3:cluster@127.0.0.1:5672/
@@ -19,3 +19,8 @@ api_workers = 2
 workers=2
 #workers_pool_size = 20000
 host_ip = 127.0.0.1
+
+[dhcp]
+omapi_secret = IetCkIN8YY5OXn/g383w0xlgVSmmda5gZpDHjMf/d0DOjS++FfhVnCm8iGi2AsHL0MWATr+8S4oa8hEA93lbxw==
+omapi_port = 7911
+omapi_server = 127.0.0.1

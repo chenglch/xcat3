@@ -29,6 +29,7 @@ from xcat3.api.controllers.v1 import node
 from xcat3.api.controllers.v1 import network
 from xcat3.api.controllers.v1 import osimage
 from xcat3.api.controllers.v1 import nic
+from xcat3.api.controllers.v1 import service
 from xcat3.api.controllers.v1 import versions
 from xcat3.api import expose
 from xcat3.common.i18n import _
@@ -96,6 +97,7 @@ class Controller(rest.RestController):
     networks = network.NetworkController()
     osimages = osimage.OSImageController()
     nics = nic.NicController()
+    services = service.ServiceController()
 
     @expose.expose(V1)
     def get(self):

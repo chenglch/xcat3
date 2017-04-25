@@ -27,8 +27,12 @@ class PXEBoot(base.BootInterface):
         """
         if not plugin_utils.get_primary_mac_address(node):
             raise exception.MissingParameterValue(
-                _("Node %s does not have any port associated with it.")
-                % node.name)
+                _("Node %s does not have any nic with mac address associated "
+                  "with it.") % node.name)
+        if not plugin_utils.get_primary_ip_address(node):
+            raise exception.MissingParameterValue(
+                _("Node %s does not have any nic with ip address associated "
+                  "with it.") % node.name)
 
     def _create_config(self, node, opts):
         template = os.path.join(self.BASEDIR, 'pxe_boot.template')
@@ -47,10 +51,28 @@ class PXEBoot(base.BootInterface):
         utils.rmtree_without_raise(
             os.path.dirname(self._get_config_path(node)))
 
-    def prepare(self, node, osimage):
+    def gen_dhcp_opts(self, node):
         """Build the configuration file and prepare kernal and initrd
 
         :param node: the node to act on.
+        :returns dhcp_opts: dhcp option dict for this node
+        :raises: MissingParameterValue if a required parameter is missing.
+        """
+
+        dhcp_opts = {
+            'mac': plugin_utils.get_primary_mac_address(node),
+            'ip': plugin_utils.get_primary_ip_address(node),
+            'hostname': node.name,
+            '67': {'ScaleMP': 'vsmp/pxelinux.0', 'other': 'pxelinux.0'},
+            '66': CONF.conductor.host_ip,
+            '12': node.name, '15': node.name}
+        return dhcp_opts
+
+    def nodeset(self, node, osimage):
+        """Build the configuration file and prepare kernal and initrd
+
+        :param node: the node to act on.
+        :param osimage: the os info create by copycds
         :raises: MissingParameterValue if a required parameter is missing.
         """
         node_path = self._get_node_path(node)

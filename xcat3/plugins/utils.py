@@ -21,3 +21,14 @@ def get_primary_mac_address(node):
         if p.get('extra') and p.get('extra').get('primary') and p.get('mac'):
             return p['mac']
     return None
+
+def get_primary_ip_address(node):
+    """Get the IP address for installation.
+
+    :param node: the node to act on
+    :returns: ip address
+    """
+    for p in node.nics_info['nics']:
+        if p.get('extra') and p.get('extra').get('primary') and p.get('ip'):
+            return p['ip']
+    return None

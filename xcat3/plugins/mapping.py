@@ -26,5 +26,5 @@ def get_control_plugin(node):
 def get_boot_plugin(node):
     boot_plugin = boot_map.get(node.netboot)
     if not boot_plugin:
-        raise exception.PluginNotFound(name=node.mgt)
+        raise exception.PluginNotFound(name=node.netboot)
     return boot_plugin

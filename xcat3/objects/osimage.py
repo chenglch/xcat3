@@ -64,7 +64,7 @@ class OSImage(base.XCAT3Object, object_base.VersionedObjectDictCompat):
     @classmethod
     def list(cls, context, limit=None, sort_key=None, sort_dir=None,
              filters=None, fields=None):
-        """Return a list of Node objects.
+        """Return a list of OSImage objects.
 
         :param context: Security context.
         :param limit: maximum number of resources to return in a single result.

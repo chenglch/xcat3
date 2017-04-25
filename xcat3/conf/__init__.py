@@ -20,7 +20,7 @@ from xcat3.conf import conductor
 from xcat3.conf import database
 from xcat3.conf import default
 from xcat3.conf import deploy
-from xcat3.conf import dhcp
+from xcat3.conf import network
 
 
 CONF = cfg.CONF
@@ -30,4 +30,4 @@ conductor.register_opts(CONF)
 database.register_opts(CONF)
 default.register_opts(CONF)
 deploy.register_opts(CONF)
-dhcp.register_opts(CONF)
+network.register_opts(CONF)

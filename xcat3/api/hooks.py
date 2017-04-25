@@ -23,7 +23,7 @@ from pecan import hooks
 from six.moves import http_client
 from xcat3.db import api as dbapi
 from xcat3.conductor import rpcapi
-from xcat3.dhcp import rpcapi as dhcp_api
+from xcat3.network import rpcapi as network_api
 
 LOG = log.getLogger(__name__)
 
@@ -67,7 +67,7 @@ class RPCHook(hooks.PecanHook):
 
     def before(self, state):
         state.request.rpcapi = rpcapi.ConductorAPI()
-        state.request.dhcp_api = dhcp_api.ConductorAPI()
+        state.request.network_api = network_api.NetworkAPI()
 
 
 class NoExceptionTracebackHook(hooks.PecanHook):

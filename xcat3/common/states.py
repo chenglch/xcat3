@@ -62,3 +62,11 @@ POWER_COMMAND_RESET = 'reset'
 
 
 ERROR = 'error'
+
+##################
+# Provision states
+##################
+
+DEPLOY_NONE = None
+DEPLOY_DHCP = 'dhcp'
+DEPLOY_NODESET = 'nodeset'

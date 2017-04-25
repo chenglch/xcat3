@@ -23,20 +23,27 @@ opts = [
     cfg.IntOpt('workers_pool_size',
                default=10, min=10,
                help=_('The size of the workers greenthread pool. ')),
-    cfg.IntOpt('heartbeat_interval',
-               default=10,
-               help=_('Seconds between conductor heart beats.')),
-    cfg.IntOpt('heartbeat_timeout',
-               default=60,
-               help=_('Maximum time (in seconds) since the last check-in '
-                      'of a conductor. A conductor is considered inactive '
-                      'when this time has been exceeded.')),
     cfg.IntOpt('timeout',
                default=3660,
                help=_('Maximum time (in seconds) to process task in a worker'
                       'thread.')),
+    cfg.StrOpt('omapi_secret',
+               default='IetCkIN8YY5OXn/g383w0xlgVSmmda5gZpDHjMf/d0DOjS++FfhVnCm8iGi2AsHL0MWATr+8S4oa8hEA93lbxw==',
+               help=_('OMAPI key generated with dnssec-keygen command.')),
+    cfg.IntOpt('omapi_port',
+               default=7911,
+               help=_('OMAPI port to manage isc-dhcp-server.')),
+    cfg.StrOpt('omapi_server',
+               default='127.0.0.1',
+               help=_('IP address of OMAPI server.')),
+    cfg.IntOpt('dhcp_check_attempts',
+               default=15,
+               help=_('Number of attempts to grab a node lock.')),
+    cfg.IntOpt('dhcp_check_retry_interval',
+               default=1,
+               help=_('Seconds to sleep between node lock attempts.')),
 ]
 
 
 def register_opts(conf):
-    conf.register_opts(opts, group='dhcp')
+    conf.register_opts(opts, group='network')

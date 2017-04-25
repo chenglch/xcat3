@@ -1,0 +1,6 @@
+host {{ hostname }} {
+  dynamic;
+  hardware ethernet {{ mac }};
+  fixed-address {{ ip }};
+        {{ statements }}
+}

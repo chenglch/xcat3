@@ -14,16 +14,16 @@
 #    under the License.
 
 import datetime
-import futurist
 import pecan
 from oslo_log import log
-from oslo_concurrency import processutils
 from pecan import rest
 from xcat3.api import expose
 from xcat3.db import api as db_api
 import xcat3.conf
 import six
 from six.moves import http_client
+import retrying
+import traceback
 from xcat3.common import exception
 from xcat3.common import utils
 from xcat3.common import states
@@ -54,7 +54,7 @@ ALLOWED_TARGET_POWER_STATES = (xcat3_states.POWER_ON,
 dbapi = db_api.get_instance()
 
 
-def _wait_rpc_result(futures, names, result):
+def _wait_rpc_result(futures, names, result, json=True):
     """Wait the result from rpc call.
 
 
@@ -84,10 +84,10 @@ def _wait_rpc_result(futures, names, result):
             for k, v in r.result().items():
                 result['nodes'][k] = v
 
-    return types.JsonType.validate(result)
+    return types.JsonType.validate(result) if json else result
 
 
-def _filter_unavailable_nodes(names):
+def _filter_unavailable_nodes(names, share=False):
     """Exclude the non-exist nodes or locked nodes.
 
         :param names: nodes names
@@ -96,19 +96,29 @@ def _filter_unavailable_nodes(names):
 
     result = dict()
     msg = _("Could not be found.")
-    exist_names =  dbapi.get_node_in(names, fields=['name',])
+    exist_names = dbapi.get_node_in(names, fields=['name', ])
     exist_names = [name[0] for name in exist_names]
     result['nodes'] = dict(
         (name, msg) for name in names if name not in exist_names)
     names = exist_names
-    msg = _("Locked temporarily")
-    locked_names = dbapi.get_node_in(names, filters=['not_reservation', ],
-                                  fields=['name', ])
-    locked_names = [name[0] for name in locked_names]
-    for name in locked_names:
-        result['nodes'][name] = msg
-    names = filter(lambda n: n not in locked_names, names)
+    if not share:
+        msg = _("Locked temporarily")
+        locked_names = dbapi.get_node_in(names, filters=['not_reservation', ],
+                                         fields=['name', ])
+        locked_names = [name[0] for name in locked_names]
+        for name in locked_names:
+            result['nodes'][name] = msg
+        names = filter(lambda n: n not in locked_names, names)
     return result, names
+
+
+def _fill_error_nodes(names, result, msg):
+    """Fill the result with unexpected error message
+        :param names:nodes names
+        :param result: status map about nodes
+    """
+    for name in names:
+        result['nodes'][name] = msg
 
 
 class Node(base.APIBase):
@@ -127,6 +137,7 @@ class Node(base.APIBase):
     netboot = wsme.wsattr(wtypes.text)
     type = wsme.wsattr(wtypes.text)
     arch = wsme.wsattr(wtypes.text)
+    state = wsme.wsattr(wtypes.text)
     osimage_name = wsme.wsattr(wtypes.text)
     scripts_name = wsme.wsattr(wtypes.text)
     control_info = {wtypes.text: types.jsontype}
@@ -209,7 +220,7 @@ class NodeProvisionController(rest.RestController):
                    wtypes.text, wtypes.text,
                    body=NodeCollection,
                    status_code=http_client.ACCEPTED)
-    def put(self, target, osimage, nodes):
+    def put(self, target, osimage=None, subnet=None, nodes=None):
         """Set the provision state of the nodes.
 
         :param target: The desired  state of the node.
@@ -223,13 +234,39 @@ class NodeProvisionController(rest.RestController):
 
         """
         names = [node.name for node in nodes.nodes if node.name]
+        if not names:
+            raise exception.InvalidParameterValue(
+                _("The node %(node)s is invalid") % {'node': nodes})
         result, names = _filter_unavailable_nodes(names)
         if not names:
             return result
-        futures = pecan.request.rpcapi.provision(pecan.request.context, names,
+        context = pecan.request.context
+        if subnet:
+            subnet = objects.Network.get_by_name(context, subnet)
+        if osimage:
+            osimage = objects.OSImage.get_by_name(context, osimage)
+        futures = pecan.request.rpcapi.provision(context, names,
                                                  target=target,
-                                                 osimage=osimage)
-        result = _wait_rpc_result(futures, names, result)
+                                                 osimage=osimage,
+                                                 subnet=subnet)
+        result = _wait_rpc_result(futures, names, result, False)
+        try:
+            # As rpc result from conductor nodes has came back, the async calls
+            # should be accepted by the network service node. Here, we build
+            # dhcp options for all the split parts together.
+            pecan.request.network_api.check_dhcp_complete(context, subnet)
+            pecan.request.network_api.enable_dhcp_option(context, subnet)
+        except retrying.RetryError:
+            msg = _('DHCP error happens, please check dhcp configuration '
+                    'file for detail')
+            _fill_error_nodes(names, result, msg)
+        except Exception as e:
+            LOG.exception(_LE(
+                'Unexpected exception while check dhcp complete status '
+                '%(err)s'), {'err': six.text_type(traceback.format_exc())})
+            _fill_error_nodes(names, result, e.message)
+
+        result = types.JsonType.validate(result)
         url_args = '/'.join('states')
         pecan.response.location = link.build_url('nodes', url_args)
         return result
@@ -377,7 +414,7 @@ class NodesController(rest.RestController):
     @expose.expose(NodeCollection, types.listtype, body=NodeCollection)
     def info(self, fields=None, nodes=None):
         if not fields:
-            fields = ['nics',]
+            fields = ['nics', ]
         names = [node.name for node in nodes.nodes if node.name]
         return self._get_nodes_collection(names, limit=None, fields=fields)
 
@@ -511,7 +548,7 @@ class NodesController(rest.RestController):
             patch = NodePatchType(**patch)
 
         names = [node['name'] for node in nodes if node.has_key('name')]
-        result, names = _filter_unavailable_nodes(names)
+        result, names = _filter_unavailable_nodes(names, share=True)
         try:
             objs = objects.Node.list_in(pecan.request.context, names)
             new_objs = []
