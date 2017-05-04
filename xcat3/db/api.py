@@ -246,10 +246,31 @@ class Connection(object):
         """Update network"""
 
     @abc.abstractmethod
+    def get_dhcp_list(self):
+        """List dhcp options"""
+
+    @abc.abstractmethod
+    def save_or_update_dhcp(self, names, dhcp_opts):
+        """Update dhcp options"""
+
+    @abc.abstractmethod
+    def destroy_dhcp(self, names):
+        """Destroy dhcp options"""
+
+    @abc.abstractmethod
     def get_services(self, type='conductor'):
         """Return conductor nodes
 
         :returns: Conductor nodes
+        """
+
+    @abc.abstractmethod
+    def get_service_from_id(self, id):
+        """Return conductor node from service id
+
+        :param id: service id
+        :returns: Conductor node
+
         """
 
     @abc.abstractmethod

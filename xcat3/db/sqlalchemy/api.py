@@ -18,6 +18,7 @@
 """SQLAlchemy storage backend."""
 
 import datetime
+import six
 import threading
 
 from oslo_db import exception as db_exc
@@ -352,9 +353,8 @@ class Connection(api.Connection):
         with _session_for_write() as session:
             query = model_query(models.Node).filter(models.Node.id.in_(
                 node_ids))
-            try:
-                nodes = query.with_lockmode('update').all()
-            except NoResultFound:
+            nodes = query.with_lockmode('update').all()
+            if not nodes:
                 raise exception.NodeNotFound(node=','.join(node_ids))
             node_models = []
             for node in nodes:
@@ -494,6 +494,44 @@ class Connection(api.Connection):
             else:
                 raise
 
+    def get_dhcp_list(self):
+        query = model_query(models.DHCP)
+        return query.all()
+
+    def save_or_update_dhcp(self, names, dhcp_opts):
+        # As there is already lock for each node, consistency is ignored here.
+        with _session_for_write() as session:
+            query = model_query(models.DHCP).filter(models.DHCP.name.in_(
+                names))
+            nodes = query.all()
+            if nodes:
+                node_models = []
+                for node in nodes:
+                    temp_opt = {'name': node.name,
+                                'opts': dhcp_opts[node.name]}
+                    node.update(temp_opt)
+                    dhcp_opts.pop(node.name)
+                    node_models.append(node)
+                session.add_all(node_models)
+
+        node_models = []
+        for k, v in six.iteritems(dhcp_opts):
+            node_model = models.DHCP()
+            temp_opt = {'name': k,
+                        'opts': v}
+            node_model.update(temp_opt)
+            node_models.append(node_model)
+        with _session_for_write() as session:
+            session.add_all(node_models)
+
+    def destroy_dhcp(self, names):
+        with _session_for_write():
+            query = model_query(models.DHCP).filter(
+                models.DHCP.name.in_(names))
+            nodes = query.all()
+            if nodes:
+                query.delete(synchronize_session=False)
+
     def get_services(self, type='conductor', check_limit=True):
         interval = CONF.heartbeat_timeout
         if check_limit:
@@ -528,12 +566,17 @@ class Connection(api.Connection):
         return ref
 
     def get_service(self, hostname):
+        return (model_query(models.Service)
+                .filter_by(hostname=hostname)
+                .all())
+
+    def get_service_from_id(self, id):
         try:
             return (model_query(models.Service)
-                    .filter_by(hostname=hostname)
-                    .all())
+                    .filter_by(id=id)
+                    .one())
         except NoResultFound:
-            raise exception.ServiceNotFound(service=hostname)
+            raise exception.ServiceNotFound(service=id)
 
     def unregister_service(self, hostname, type='conductor'):
         with _session_for_write():

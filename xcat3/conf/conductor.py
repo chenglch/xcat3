@@ -1,3 +1,4 @@
+# Updated 2017 for xcat test purpose
 # Copyright 2016 Intel Corporation
 # Copyright 2013 Hewlett-Packard Development Company, L.P.
 # Copyright 2013 International Business Machines Corporation

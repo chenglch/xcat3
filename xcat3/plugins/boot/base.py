@@ -5,6 +5,7 @@ import os
 import six
 from oslo_config import cfg
 
+from xcat3.common import exception
 from xcat3.common import utils
 from xcat3.plugins import base
 from xcat3.plugins import utils as plugin_utils
@@ -18,13 +19,26 @@ class BootInterface(base.BaseInterface):
     CONFIG_DIR = None
     BASEDIR = None
 
-    @abc.abstractmethod
     def validate(self, node):
         """validate the specific attribute
 
         :param node: the node to act on.
         :raises: MissingParameterValue if a required parameter is missing.
         """
+        mac = plugin_utils.get_primary_mac_address(node)
+        if not mac:
+            raise exception.MissingParameterValue(
+                _("Node %s does not have any nic with mac address associated "
+                  "with it.") % node.name)
+
+        ip = plugin_utils.get_primary_ip_address(node)
+        if not ip:
+            raise exception.MissingParameterValue(
+                _("Node %s does not have any nic with ip address associated "
+                  "with it.") % node.name)
+
+        setattr(node, 'mac', mac)
+        setattr(node, 'ip', ip)
 
     @abc.abstractmethod
     def gen_dhcp_opts(self, node):
@@ -42,6 +56,13 @@ class BootInterface(base.BaseInterface):
         :param node: the node to act on.
         :param osimage: the os info create by copycds
         :raises: MissingParameterValue if a required parameter is missing.
+        """
+
+    @abc.abstractmethod
+    def continue_deploy(self, node):
+        """Continue deploy as callback request received
+
+        :param node: the node to act on.
         """
 
     @abc.abstractmethod

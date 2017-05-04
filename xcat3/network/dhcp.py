@@ -8,6 +8,7 @@ import six
 
 from oslo_log import log as logging
 from oslo_service import loopingcall
+from xcat3.db import api as db_api
 from xcat3.common import exception
 from xcat3.common.i18n import _, _LE, _LI, _LW
 from xcat3.common import utils
@@ -16,12 +17,10 @@ from xcat3.conf import CONF
 LOG = logging.getLogger(__name__)
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 
-
 @six.add_metaclass(abc.ABCMeta)
 class DhcpBase(object):
     def __init__(self):
         self.subnet_opts = []
-        self.node_opts = []
 
     @abc.abstractmethod
     def start(self):
@@ -58,11 +57,11 @@ class ISCDHCPService(DhcpBase):
     LEASE_PATH = '/var/lib/dhcp/dhcpd.leases'
     DHCP_DICT = {'66': 'server.server-name', '67': 'server.filename',
                  '12': 'host-name', '15': 'server.ddns-hostname'}
+    dbapi = db_api.get_instance()
 
     def __init__(self):
         super(ISCDHCPService, self).__init__()
         self.subnet_opts = list()
-        self.node_opts = dict()
         self.dhcp_pobj = None
         self.request_map = dict()
         utils.ensure_file(self.LEASE_PATH)
@@ -129,9 +128,6 @@ class ISCDHCPService(DhcpBase):
 
         utils.kill_child_process(pid, 5)
 
-    def check_complete(self, context):
-        return False if self.request_map.get(context.request_id) else True
-
     def status(self):
         try:
             pypureomapi.Omapi(CONF.network.omapi_server,
@@ -147,7 +143,8 @@ class ISCDHCPService(DhcpBase):
     def get_subnet_opts(self):
         return self.subnet_opts
 
-    def _build_supersede(self, opts):
+    @classmethod
+    def _build_supersede(cls, opts):
         """Generate dhop configuration content from dhcp option dict"""
         statements = []
         opt = opts.pop('67')
@@ -169,11 +166,11 @@ class ISCDHCPService(DhcpBase):
                             '\n\t} ' % v
             statements.append(conf)
         elif opt:
-            conf = 'supersede %s = "%s";' % (self.DHCP_DICT.get('67'), opt)
+            conf = 'supersede %s = "%s";' % (cls.DHCP_DICT.get('67'), opt)
             statements.append(conf)
 
         for k, v in six.iteritems(opts):
-            conf = '\tsupersede %s = "%s";' % (self.DHCP_DICT.get(k), v)
+            conf = '\tsupersede %s = "%s";' % (cls.DHCP_DICT.get(k), v)
             statements.append(conf)
             if k == '66':
                 conf = '\tsupersede server.next-server %s;' % v
@@ -181,13 +178,10 @@ class ISCDHCPService(DhcpBase):
 
         return '\n'.join(statements)
 
-    @utils.make_synchronized
-    def update_opts(self, context, op, names, dhcp_opts):
+    @classmethod
+    def update_opts(cls, context, op, names, dhcp_opts):
         """Store the configuration options node_opts as dict"""
-        if not self.request_map.get(context.request_id):
-            self.request_map[context.request_id] = 1
-        else:
-            self.request_map[context.request_id] += 1
+        node_opts = {}
         if op == 'add':
             template = os.path.join(BASEDIR, 'dhcp_node.template')
             for name in names:
@@ -196,17 +190,12 @@ class ISCDHCPService(DhcpBase):
                 config['ip'] = opts.pop('ip')
                 config['mac'] = opts.pop('mac')
                 config['hostname'] = opts.pop('hostname')
-                config['statements'] = self._build_supersede(opts)
+                config['statements'] = cls._build_supersede(opts)
                 config['content'] = utils.render_template(template, config)
-                self.node_opts[name] = config
+                node_opts[name] = config
+            cls.dbapi.save_or_update_dhcp(names, node_opts)
         elif op == 'remove':
-            for name in names:
-                if self.node_opts.has_key(name):
-                    self.node_opts.pop(name)
-
-        self.request_map[context.request_id] -= 1
-        if self.request_map[context.request_id] == 0:
-            del self.request_map[context.request_id]
+            cls.dbapi.destroy_dhcp(names)
 
     def add_subnet(self, subnet_opts):
         self.subnet_opts.append(subnet_opts)
@@ -230,8 +219,10 @@ class ISCDHCPService(DhcpBase):
 
     def build_conf(self):
         node_cfgs = []
-        for k, v in six.iteritems(self.node_opts):
-            node_cfgs.append(v['content'])
+        node_opts = self.dbapi.get_dhcp_list()
+        for opt in node_opts:
+            content = opt['opts']['content']
+            node_cfgs.append(content)
         cfg = '%(global_cfg)s%(subnet_cfg)s\n%(node_cfg)s' % {
             'global_cfg': self._global_cfg(),
             'subnet_cfg': self._build_subnet_cfg(),

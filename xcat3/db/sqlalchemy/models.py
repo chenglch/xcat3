@@ -70,6 +70,7 @@ class Service(Base):
     id = Column(Integer, primary_key=True)
     hostname = Column(String(255), nullable=False)
     type = Column(String(255), default='conductor')
+    workers = Column(Integer)
     online = Column(Boolean, default=True)
 
 
@@ -132,14 +133,22 @@ class Networks(Base):
         schema.UniqueConstraint('name', name='uniq_network0name'),
         table_args())
     id = Column(Integer, primary_key=True)
-    name = Column(String(255), nullable=True)
-    subnet = Column(String(36), nullable=True)
+    name = Column(String(255))
+    subnet = Column(String(36))
     netmask = Column(String(36), nullable=True)
     gateway = Column(String(36), nullable=True)
     nameservers = Column(String(255), nullable=True)
     ntpservers = Column(String(255), nullable=True)
+    domain = Column(String(255), nullable=True)
     dynamic_range = Column(String(255), nullable=True)
     extra = Column(db_types.JsonEncodedDict, nullable=True)
+
+
+class DHCP(Base):
+    """Represents the dhcp configuration for each host"""
+    __tablename__ = 'dhcp'
+    name = Column(String(255), primary_key=True)
+    opts = Column(db_types.JsonEncodedDict, nullable=True)
 
 
 class OSImage(Base):

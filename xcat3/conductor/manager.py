@@ -28,11 +28,10 @@ from xcat3.common import exception
 from xcat3.conductor import base_manager
 from xcat3.conductor import task_manager
 from xcat3.conf import CONF
+from xcat3.network import dhcp
 from xcat3 import objects
 from xcat3.common import states as xcat3_states
-from xcat3.common import ip_lib
 from xcat3.common.i18n import _, _LE, _LI, _LW
-from xcat3.network import dhcp
 from xcat3.plugins import mapping
 
 MANAGER_TOPIC = 'xcat3.conductor_manager'
@@ -49,6 +48,7 @@ class ConductorManager(base_manager.BaseConductorManager):
 
     def __init__(self, host, topic):
         super(ConductorManager, self).__init__(host, topic)
+        self.plugins = mapping.PluginMap()
 
     def _filter_result(self, result, nodes):
         names = [name for name, val in six.iteritems(result) if
@@ -116,7 +116,7 @@ class ConductorManager(base_manager.BaseConductorManager):
                  {'nodes': str(names), 'target': target})
 
         def _change_power_state(node, target):
-            control_plugin = mapping.get_control_plugin(node)
+            control_plugin = self.plugins.get_control_plugin(node)
             control_plugin.validate(node)
             control_plugin.set_power_state(node, target)
 
@@ -145,7 +145,7 @@ class ConductorManager(base_manager.BaseConductorManager):
                  {'nodes': str(names)})
 
         def _get_power_state(node):
-            control_plugin = mapping.get_control_plugin(node)
+            control_plugin = self.plugins.get_control_plugin(node)
             control_plugin.validate(node)
             return control_plugin.get_power_state(node)
 
@@ -176,6 +176,11 @@ class ConductorManager(base_manager.BaseConductorManager):
         with task_manager.acquire(context, names,
                                   purpose='nodes deletion') as task:
             nodes = task.nodes
+            # remove record about dhcp in database if exist, but do not disable
+            # the dhcp service immediately.
+            dhcp.ISCDHCPService.update_opts(context, 'remove', names, None)
+            # TODO(chenglch): If node is in nodeset state, do not allow this
+            # operation as provision data should be clean up at first.
             objects.Node.destroy_nodes(nodes)
             LOG.info(_LI('Successfully deleted nodes %(nodes)s.'),
                      {'nodes': names})
@@ -204,8 +209,16 @@ class ConductorManager(base_manager.BaseConductorManager):
                  {'nodes': str(names), 'target': target})
 
         def _provision(node, osimage, dhcp_opts, subnet=None):
+            """One provision step for each node
+            :param node: node to act on
+            :param osimage: osimage object, if None means just setup dhcp
+                            options.
+            :param dhcp_opts: An empty dict used to fill the dhcp options then
+                              return to the caller.
+            :param subnet: network object.
 
-            boot_plugin = mapping.get_boot_plugin(node)
+            """
+            boot_plugin = self.plugins.get_boot_plugin(node)
             boot_plugin.validate(node)
             dhcp_opts[node.name].update(boot_plugin.gen_dhcp_opts(node))
             if not osimage:
@@ -213,13 +226,16 @@ class ConductorManager(base_manager.BaseConductorManager):
                 return
 
             node.state = xcat3_states.DEPLOY_NODESET
+            node.conductor_affinity = self.service.id
             boot_plugin.nodeset(node, osimage)
+            os_plugin = self.plugins.get_osimage_plugin(osimage)
+            os_plugin.validate(node)
+            os_plugin.render(node, osimage)
 
         def _clean(node):
-            boot_plugin = mapping.get_boot_plugin(node)
+            boot_plugin = self.plugins.get_boot_plugin(node)
             boot_plugin.clean(node)
             node.state = xcat3_states.DEPLOY_NONE
-
 
         with task_manager.acquire(context, names, obj_info=['nics', ],
                                   purpose='nodes provision') as task:
@@ -227,8 +243,10 @@ class ConductorManager(base_manager.BaseConductorManager):
             nodes = task.nodes
             if target and target.startswith('un_'):
                 try:
-                    self.network_api.update_dhcp(context, 'remove', names,
-                                                 None)
+                    # TODO(chenglch): Currently only ISC is supported, use it
+                    # directly.
+                    dhcp.ISCDHCPService.update_opts(context, 'remove', names,
+                                                    None)
                     result = self._process_nodes_worker(_clean, nodes=nodes)
                     objects.Node.update_nodes(nodes)
                 except Exception as e:
@@ -246,8 +264,8 @@ class ConductorManager(base_manager.BaseConductorManager):
                                                 subnet=subnet)
             names, nodes = self._filter_result(result, nodes)
             try:
-                self.network_api.update_dhcp(context, 'add', names, dhcp_opts,
-                                             subnet)
+                dhcp.ISCDHCPService.update_opts(context, 'add', names,
+                                                dhcp_opts)
                 objects.Node.update_nodes(nodes)
             except Exception as e:
                 self._fill_result(result, names, e.message)
@@ -272,7 +290,7 @@ class ConductorManager(base_manager.BaseConductorManager):
                  {'nodes': str(names)})
 
         def _get_boot_device(node):
-            control_plugin = mapping.get_control_plugin(node)
+            control_plugin = self.plugins.get_control_plugin(node)
             control_plugin.validate(node)
             return control_plugin.get_boot_device(node)
 
@@ -298,12 +316,12 @@ class ConductorManager(base_manager.BaseConductorManager):
         :raises: MissingParameterValue
 
         """
-        LOG.info(
-            "RPC set_boot_device boot_device called for nodes %(nodes)s. " % {
-                'nodes': str(names), 'boot_device': boot_device})
+        LOG.info("RPC set_boot_device boot_device called for nodes "
+                 "%(nodes)s. " % {'nodes': str(names),
+                                  'boot_device': boot_device})
 
         def _set_boot_device(node, boot_device):
-            control_plugin = mapping.get_control_plugin(node)
+            control_plugin = self.plugins.get_control_plugin(node)
             control_plugin.validate(node)
             return control_plugin.set_boot_device(node, boot_device)
 
@@ -313,3 +331,26 @@ class ConductorManager(base_manager.BaseConductorManager):
                                                 nodes=task.nodes,
                                                 boot_device=boot_device)
             return result
+
+    @messaging.expected_exceptions(exception.InvalidParameterValue,
+                                   exception.NoFreeServiceWorker,
+                                   exception.NodeLocked)
+    def provision_callback(self, context, name, action):
+        """RPC method to continue the provision for node.
+
+        :param context: an admin context.
+        :param name: the node name to act on.
+        :param action: action message for the node.
+        :raises: InvalidParameterValue
+        :raises: MissingParameterValue
+        """
+        LOG.info("RPC provision_callback called for nodes %(nodes)s. " %
+                 {'nodes': str(name)})
+        with task_manager.acquire(context, [name],
+                                  purpose='node provision callback') as task:
+            node = task.nodes[0]
+            boot_plugin = self.plugins.get_boot_plugin(node)
+            boot_plugin.continue_deploy(node)
+            node.state = xcat3_states.DEPLOY_DONE
+            node.conductor_affinity = None
+            objects.Node.update_nodes([node])

@@ -45,6 +45,7 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         'scripts_info': object_fields.FlexibleDictField(nullable=True),
         'control_info': object_fields.FlexibleDictField(nullable=True),
         'console_info': object_fields.FlexibleDictField(nullable=True),
+        'conductor_affinity': object_fields.IntegerField(nullable=True),
     }
 
     @classmethod

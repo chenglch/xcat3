@@ -22,6 +22,7 @@ def get_primary_mac_address(node):
             return p['mac']
     return None
 
+
 def get_primary_ip_address(node):
     """Get the IP address for installation.
 

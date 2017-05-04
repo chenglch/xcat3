@@ -40,6 +40,7 @@ class Service(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         'id': object_fields.IntegerField(),
         'hostname': object_fields.StringField(),
         'type': object_fields.StringField(),
+        'workers': object_fields.IntegerField(),
         'online': object_fields.BooleanField(),
     }
 
@@ -80,7 +81,9 @@ class Service(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         """
         try:
             db_cond = cls.dbapi.register_service(
-                {'hostname': hostname, 'type': type},
+                {'hostname': hostname, 'type': type,
+                 'workers': CONF.conductor.workers if
+                 type == 'conductor' else 1},
                 update_existing=update_existing)
         except Exception as e:
             if 'Duplicate entry' in e.message:

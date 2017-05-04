@@ -28,13 +28,12 @@ import six
 from xcat3.common import exception
 from xcat3.common import rpc
 from xcat3.common.i18n import _, _LE, _LI, _LW
-from xcat3.conductor import manager
 from xcat3.conf import CONF
 from xcat3.db import api as dbapi
 from xcat3.objects import base as objects_base
 
 LOG = log.getLogger(__name__)
-
+MANAGER_TOPIC = 'xcat3.conductor_manager'
 
 class ConductorAPI(object):
     """Client side of the conductor RPC API.
@@ -46,7 +45,7 @@ class ConductorAPI(object):
         self.topic = topic
         self.dbapi = dbapi.get_instance()
         if self.topic is None:
-            self.topic = manager.MANAGER_TOPIC
+            self.topic = MANAGER_TOPIC
 
         target = messaging.Target(topic=self.topic,
                                   version='1.0')
@@ -71,7 +70,7 @@ class ConductorAPI(object):
 
         """
 
-        def _wocker(futures, func, *args, **kwargs):
+        def _worker(futures, func, *args, **kwargs):
             try:
                 future = self._executor.submit(func, *args, **kwargs)
                 if kwargs.get('names'):
@@ -81,23 +80,26 @@ class ConductorAPI(object):
                 raise exception.NoFreeAPIWorker()
 
         futures = []
-        loop = 1
-        names = []
-        if kwargs.get('names') and len(
-                kwargs.get('names')) > CONF.api.per_group_count:
+        local_workers = kwargs.pop('workers')
+        if local_workers > 1 and kwargs.get('names') and len(
+                kwargs.get('names')) < CONF.api.per_group_count:
+            local_workers = 1
+
+        if local_workers > 1:
             names = kwargs.pop('names')
-            loop = CONF.api.conductor_groups
-        if loop > 1:
-            groups = [[] for i in xrange(loop)]
-            per_group = len(names) / loop
-            for i in xrange(loop - 1):
+            groups = [[] for i in range(local_workers)]
+            per_group = len(names) / local_workers
+            for i in range(local_workers - 1):
                 groups[i].extend(names[i * per_group:(i + 1) * per_group])
-            groups[loop - 1].extend(names[(loop - 1) * per_group:])
-            for i in xrange(loop):
+            groups[local_workers - 1].extend(
+                names[(local_workers - 1) * per_group:])
+            for i in range(local_workers):
                 kwargs['names'] = groups[i]
-                _wocker(futures, func, *args, **kwargs)
-        else:
-            _wocker(futures, func, *args, **kwargs)
+                if not kwargs['names']:
+                    continue
+                _worker(futures, func, *args, **kwargs)
+        elif kwargs['names']:
+            _worker(futures, func, *args, **kwargs)
         return futures
 
     def wait_workers(self, futures, timeout):
@@ -121,6 +123,8 @@ class ConductorAPI(object):
     def get_topic_for(self, nodes):
         """Get the RPC topic for the conductor service the nodes are mapped to.
 
+        This function is for rpc calls for multiple nodes.
+
         :param nodes: the names of nodes
         :returns: an RPC topic string.
         :raises: NoValidHost
@@ -132,22 +136,56 @@ class ConductorAPI(object):
             raise exception.NoValidHost(reason=reason)
 
         topic_dict = dict()
-        nodes_list = [[] for i in xrange(len(conductors))]
-        per_host = len(nodes) / len(conductors)
-        host_id = 0
+        workers = 0
+        for cond in conductors:
+            # rpc workers is the number of child processes
+            cond.workers = cond.workers + 1 if cond.workers > 1 else 1
+            workers += cond.workers
 
-        for i in xrange(len(nodes)):
-            if i == (host_id + 1) * per_host:
-                host_id = host_id + 1 if host_id < len(conductors) - 1 \
-                    else host_id
-            nodes_list[host_id].append(nodes[i])
+        per_worker = len(nodes) / workers
+        j = 0
+        for i in range(len(conductors) - 1):
+            cond = conductors[i]
+            topic = '%s.%s' % (self.topic, cond.hostname.encode('utf-8'))
+            t = dict()
+            t['nodes'] = nodes[j: cond.workers * per_worker]
+            t['workers'] = cond.workers
+            topic_dict[topic] = t
+            j += cond.workers * per_worker
 
-        for i in xrange(len(conductors)):
-            topic = '%s.%s' % (self.topic,
-                               conductors[i].hostname.encode('utf-8'))
-            topic_dict[topic] = nodes_list[i]
-
+        cond = conductors[len(conductors) - 1]
+        topic = '%s.%s' % (self.topic, cond.hostname.encode('utf-8'))
+        t = {'nodes': nodes[j:], 'workers': cond.workers}
+        topic_dict[topic] = t
         return topic_dict
+
+    def get_topic_for_callback(self, conductor_id):
+        """Get rpc topic for callback node
+
+        :param node: the callback node
+        """
+        conductor = self.dbapi.get_service_from_id(id=conductor_id)
+        return '%s.%s' % (self.topic, conductor.hostname.encode('utf-8'))
+
+
+    def spawn_rpc_worker(self, func, *args, **kwargs):
+        if not kwargs.has_key('names'):
+            raise exception.InvalidParameterValue(
+                _("Invalid parameter kwargs %(kwargs)s") % {
+                    'kwargs': str(kwargs)})
+
+        topic_dict = self.get_topic_for(kwargs.pop('names'))
+        futures = []
+        for topic, node_info in topic_dict.items():
+            nodes = node_info['nodes']
+            workers = node_info['workers']
+            cctxt = self.client.prepare(topic=topic or self.topic,
+                                        version='1.0')
+            temp = self.spawn_worker(func, cctxt, workers=workers, names=nodes,
+                                     *args, **kwargs)
+            futures.extend(temp)
+
+        return futures
 
     def change_power_state(self, context, names, target):
         """Change a node's power state.
@@ -167,16 +205,8 @@ class ConductorAPI(object):
             return cctxt.call(context, 'change_power_state', names=names,
                               target=target)
 
-        topic_dict = self.get_topic_for(names)
-        futures = []
-        for topic, nodes in topic_dict.items():
-            cctxt = self.client.prepare(topic=topic or self.topic,
-                                        version='1.0')
-            temp = self.spawn_worker(_change_power_state, cctxt, names=nodes,
+        return self.spawn_rpc_worker(_change_power_state, names=names,
                                      target=target)
-            futures.extend(temp)
-
-        return futures
 
     def get_power_state(self, context, names):
         """Get a node's power state.
@@ -193,15 +223,7 @@ class ConductorAPI(object):
         def _get_power_state(cctxt, names):
             return cctxt.call(context, 'get_power_state', names=names)
 
-        topic_dict = self.get_topic_for(names)
-        futures = []
-        for topic, nodes in topic_dict.items():
-            cctxt = self.client.prepare(topic=topic or self.topic,
-                                        version='1.0')
-            temp = self.spawn_worker(_get_power_state, cctxt, names=nodes)
-            futures.extend(temp)
-
-        return futures
+        return self.spawn_rpc_worker(_get_power_state, names=names)
 
     def destroy_nodes(self, context, names):
         """Change a node's power state.
@@ -219,15 +241,7 @@ class ConductorAPI(object):
         def _destroy_nodes(cctxt, names):
             return cctxt.call(context, 'destroy_nodes', names=names)
 
-        topic_dict = self.get_topic_for(names)
-        futures = []
-        for topic, nodes in topic_dict.items():
-            cctxt = self.client.prepare(topic=topic or self.topic,
-                                        version='1.0')
-            temp = self.spawn_worker(_destroy_nodes, cctxt, names=nodes)
-            futures.extend(temp)
-
-        return futures
+        return self.spawn_rpc_worker(_destroy_nodes, names=names)
 
     def provision(self, context, names, target, osimage, subnet=None):
         """Change nodes's provision state.
@@ -247,17 +261,8 @@ class ConductorAPI(object):
             return cctxt.call(context, 'provision', names=names,
                               target=target, osimage=osimage, subnet=subnet)
 
-        topic_dict = self.get_topic_for(names)
-        futures = []
-        for topic, nodes in topic_dict.items():
-            cctxt = self.client.prepare(topic=topic or self.topic,
-                                        version='1.0')
-            temp = self.spawn_worker(_provision, cctxt, names=nodes,
-                                     target=target, osimage=osimage,
-                                     subnet=subnet)
-            futures.extend(temp)
-
-        return futures
+        return self.spawn_rpc_worker(_provision, names=names, target=target,
+                                     osimage=osimage, subnet=subnet)
 
     def get_boot_device(self, context, names):
         """Get a node's boot device
@@ -274,15 +279,7 @@ class ConductorAPI(object):
         def _get_boot_device(cctxt, names):
             return cctxt.call(context, 'get_boot_device', names=names)
 
-        topic_dict = self.get_topic_for(names)
-        futures = []
-        for topic, nodes in topic_dict.items():
-            cctxt = self.client.prepare(topic=topic or self.topic,
-                                        version='1.0')
-            temp = self.spawn_worker(_get_boot_device, cctxt, names=nodes)
-            futures.extend(temp)
-
-        return futures
+        return self.spawn_rpc_worker(_get_boot_device, names=names)
 
     def set_boot_device(self, context, names, boot_device):
         """Get a node's boot device
@@ -300,13 +297,17 @@ class ConductorAPI(object):
             return cctxt.call(context, 'set_boot_device', names=names,
                               boot_device=boot_device)
 
-        topic_dict = self.get_topic_for(names)
-        futures = []
-        for topic, nodes in topic_dict.items():
-            cctxt = self.client.prepare(topic=topic or self.topic,
-                                        version='1.0')
-            temp = self.spawn_worker(_set_boot_device, cctxt, names=nodes,
+        return self.spawn_rpc_worker(_set_boot_device, names=names,
                                      boot_device=boot_device)
-            futures.extend(temp)
 
-        return futures
+    def provision_callback(self, context, name, action, topic):
+        """RPC method to continue the provision for node.
+
+        :param context: an admin context.
+        :param name: the node name to act on.
+        :param action: action message for the node.
+        :raises: NoFreeServiceWorker when there is no free worker to start
+                 async task.
+        """
+        cctxt = self.client.prepare(topic=topic or self.topic, version='1.0')
+        cctxt.cast(context, 'provision_callback', name=name, action=action)

@@ -1,3 +1,4 @@
+# Updated 2017 for xcat test purpose
 # Copyright 2016 Intel Corporation
 # Copyright 2013 Hewlett-Packard Development Company, L.P.
 # All Rights Reserved.
@@ -55,11 +56,8 @@ opts = [
     cfg.IntOpt('workers_pool_size',
                default=1000, min=10,
                help=_('The size of the workers greenthread pool. ')),
-    cfg.IntOpt('conductor_groups',
-               default=4, min=1,
-               help=_('The size of the process workers per conductor host ')),
     cfg.IntOpt('per_group_count',
-               default=150, min=1,
+               default=200, min=1,
                help=_('The max amount of nodes to sumbit to the conductor '
                       'service each time'))
 ]

@@ -5,8 +5,10 @@ shared-network {{network.nic}} {
     min-lease-time 43200;
     default-lease-time 43200;
     option routers  {{network.router}};
-    next-server  {{network.nextserver}};
-
+    next-server  {{network.next_server}};
+    {% if network.domain_name %}option domain-name "{{network.domain_name}}";{% endif %}
+    {% if network.domain_name_servers %}option domain-name-servers {{network.domain_name_servers}};{% endif %}
+    {% if network.domain_search %}option domain-search  "{{network.domain_search}}";{% endif %}
     if option user-class-identifier = "xNBA" and option client-architecture = 00:00 { #x86, xCAT Network Boot Agent
        always-broadcast on;
        filename = "http://{{network.conductor}}/tftpboot/xcat/xnba/nets/10.0.0.0_8";
@@ -30,7 +32,7 @@ shared-network {{network.nic}} {
        filename "/yaboot";
     }
     {% if network.dynamic_range %}
-    aa {{ network.dynamic_range }}
+    {{ network.dynamic_range }}
     {% endif %}
   } # {{network.subnet}}/{{network.netmask}} subnet_end
 } # {{network.nic}} nic_end

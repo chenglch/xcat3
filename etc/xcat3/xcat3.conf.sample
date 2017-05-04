@@ -2,25 +2,29 @@
 #
 # From xcat3
 #
-#rpc_backend = rabbit
 #log_dir = /var/log/xcat3
 rpc_response_timeout = 3600
-transport_url = rabbit://xcat3:cluster@127.0.0.1:5672/
+transport_url = rabbit://xcat3:cluster@11.4.40.22:5672/
 
 [database]
-connection = mysql+pymysql://xcat3:cluster@127.0.0.1/xcat3?charset=utf8
+connection = mysql+pymysql://xcat3:cluster@11.4.40.22/xcat3?charset=utf8
 backend = sqlalchemy
 
 [api]
 max_limit = 10000
 api_workers = 2
+host_ip = 11.4.40.22
+# port = 3010
 
 [conductor]
 workers=2
-#workers_pool_size = 20000
-host_ip = 127.0.0.1
+# workers_pool_size = 6000
+host_ip = 11.4.40.22
 
 [dhcp]
 omapi_secret = IetCkIN8YY5OXn/g383w0xlgVSmmda5gZpDHjMf/d0DOjS++FfhVnCm8iGi2AsHL0MWATr+8S4oa8hEA93lbxw==
 omapi_port = 7911
 omapi_server = 127.0.0.1
+
+[oslo_concurrency]
+lock_path = /var/lib/xcat3

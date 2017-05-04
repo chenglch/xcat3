@@ -69,7 +69,7 @@ class NetworkAPI(object):
             cctxt.cast(context, 'restart_dhcp')
 
     def get_topic_for(self, context, subnet=None):
-        """Get the RPC topic for the network service the nodes are mapped to.
+        """Get the RPC topic for the network service where nodes are mapped to.
 
         :param context: request context.
         :param subnet: subnet in network object
@@ -95,45 +95,6 @@ class NetworkAPI(object):
             reason = (_('Could not find available network service, please '
                         'check network object.'))
         raise exception.NoValidHost(reason=reason)
-
-    def update_dhcp(self, context, op, names, dhcp_opts, subnet=None):
-        """Update dhcp options for node .
-
-        :param context: request context.
-        :param names: names of nodes.
-        :param dhcp_opts: dhcp options for each node.
-        :param subnet: subnet object, used to determine the target network
-                       service node.
-        :raises: NoFreeServiceWorker when there is no free worker to start
-                 async task.
-
-        """
-        topic = self.get_topic_for(context, subnet)
-        cctxt = self.client.prepare(topic=topic or self.topic,
-                                    version='1.0')
-        # NOTE(chenglch): subnet has been used to select the target network
-        # service node, no need to transfer the subnet object with the rpc call
-        # again.
-        cctxt.cast(context, 'update_dhcp', op=op, names=names,
-                   dhcp_opts=dhcp_opts)
-
-    @retrying.retry(
-        retry_on_result=lambda r: not r,
-        stop_max_attempt_number=CONF.network.dhcp_check_attempts,
-        wait_fixed=CONF.network.dhcp_check_retry_interval * 1000)
-    def check_dhcp_complete(self, context, subnet=None):
-        """RPC method to check the complete status for the request
-
-        :param context: an admin context.
-        :raises: NoFreeServiceWorker when there is no free worker to start
-                 async task.
-        """
-        LOG.info(_LI('Check the dhcp complete status for request '
-                     '%s' % context.request_id))
-        topic = self.get_topic_for(context, subnet)
-        cctxt = self.client.prepare(topic=topic or self.topic,
-                                    version='1.0')
-        return cctxt.call(context, 'check_dhcp_complete')
 
     def enable_dhcp_option(self, context, subnet=None):
         """RPC method to enable dhcp options

@@ -143,6 +143,7 @@ class Node(base.APIBase):
     control_info = {wtypes.text: types.jsontype}
     console_info = {wtypes.text: types.jsontype}
     nics_info = {wtypes.text: types.jsontype}
+    conductor_affinity = workers = wsme.wsattr(int, readonly=True)
 
     def __init__(self, **kwargs):
         self.fields = []
@@ -216,6 +217,11 @@ class NodeCollection(collection.Collection):
 
 
 class NodeProvisionController(rest.RestController):
+
+    _custom_actions = {
+        'callback': ['PUT']
+    }
+
     @expose.expose(types.jsontype, wtypes.text,
                    wtypes.text, wtypes.text,
                    body=NodeCollection,
@@ -254,15 +260,10 @@ class NodeProvisionController(rest.RestController):
             # As rpc result from conductor nodes has came back, the async calls
             # should be accepted by the network service node. Here, we build
             # dhcp options for all the split parts together.
-            pecan.request.network_api.check_dhcp_complete(context, subnet)
             pecan.request.network_api.enable_dhcp_option(context, subnet)
-        except retrying.RetryError:
-            msg = _('DHCP error happens, please check dhcp configuration '
-                    'file for detail')
-            _fill_error_nodes(names, result, msg)
         except Exception as e:
             LOG.exception(_LE(
-                'Unexpected exception while check dhcp complete status '
+                'Unexpected exception while activating dhcp service '
                 '%(err)s'), {'err': six.text_type(traceback.format_exc())})
             _fill_error_nodes(names, result, e.message)
 
@@ -270,6 +271,28 @@ class NodeProvisionController(rest.RestController):
         url_args = '/'.join('states')
         pecan.response.location = link.build_url('nodes', url_args)
         return result
+
+    @expose.expose(types.jsontype, wtypes.text, body=types.jsontype)
+    def callback(self, name, action=None):
+        msg = "Callback request reveived name=%(name)s" % {'name':name}
+        if action is not None:
+            msg += ' action=%s' % str(action)
+        LOG.info(_LI(msg))
+        node = objects.Node.get_by_name(pecan.request.context, name)
+        if node.state != xcat3_states.DEPLOY_NODESET or \
+                        node.conductor_affinity is None:
+            raise exception.DeployStateFailure(name=node.name)
+        if action is not None:
+            if action.has_key('fetch_ssh_pub'):
+                key = {'pub_key': None}
+                with open('/root/.ssh/id_rsa.pub', 'r') as f:
+                    key['pub_key'] = f.read()
+                    return types.JsonType.validate(key)
+
+        topic = pecan.request.rpcapi.get_topic_for_callback(
+            node.conductor_affinity)
+        pecan.request.rpcapi.provision_callback(pecan.request.context, name,
+                                                action, topic)
 
 
 class BootDeviceController(rest.RestController):
@@ -442,8 +465,7 @@ class NodesController(rest.RestController):
         db_nodes = dbapi.get_node_list(limit=limit, sort_key=sort_key,
                                        sort_dir=sort_dir, fields=fields)
         results = {'nodes': []}
-        for node in db_nodes:
-            results['nodes'].append(node[0])
+        results['nodes'] = [node[0] for node in db_nodes]
         return results
 
     @expose.expose(types.jsontype, body=NodeCollection,
@@ -455,6 +477,7 @@ class NodesController(rest.RestController):
         """
 
         def _create_object(node, result):
+            new_node = None
             try:
                 context = pecan.request.context
                 if node.name in _REST_RESOURCE:
@@ -495,7 +518,8 @@ class NodesController(rest.RestController):
             new_nodes = []
             for node in nodes:
                 new_node = _create_object(node, result)
-                new_nodes.append(new_node)
+                if new_node is not None:
+                    new_nodes.append(new_node)
             if new_nodes:
                 objects.Node.create_nodes(new_nodes)
             return result

@@ -72,8 +72,11 @@ class NetworkManager(base_manager.BaseServiceManager):
             opts['netmask'] = netmask
             opts['netbits'] = ip_wappter.get_net_bits(netmask)
             opts['conductor'] = nic_ip
-            opts['nextserver'] = nic_ip
-            opts['router'] = nic_ip
+            opts['next_server'] = nic_ip
+            opts['router'] = network.gateway if network.gateway else nic_ip
+            opts['domain_name'] = network.domain
+            opts['domain_name_servers'] = network.nameservers
+            opts['domain_search'] = network.domain
             opts['subnet_id'] = network.id
             network_opts = {"network": opts}
             self.dhcp_service.add_subnet(network_opts)
@@ -104,9 +107,7 @@ class NetworkManager(base_manager.BaseServiceManager):
         """RPC method to check if the subnet opts is supported
 
         :param context: an admin context.
-        :param subnet: subnet like 10.0.0.0, if None, means any subnet is ok
-        :param netmask: netmask like 255.0.0.0, if None, means any netmask is
-                        ok
+        :param subnet: network object
         :returns: True if support, False if not support
         :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
@@ -129,39 +130,6 @@ class NetworkManager(base_manager.BaseServiceManager):
             if opt.get('network').get('subnet_id') == subnet.id:
                 return True
         return False
-
-    @messaging.expected_exceptions(exception.InvalidParameterValue,
-                                   exception.NoFreeServiceWorker,
-                                   exception.NodeLocked)
-    def update_dhcp(self, context, op, names, dhcp_opts):
-        """RPC method to update dhcp options
-
-        :param context: an admin context.
-        :param dhcp_opts: dhcp options for each node
-        :raises: NoFreeServiceWorker when there is no free worker to start
-                 async task.
-        :raises: InvalidParameterValue
-        :raises: MissingParameterValue
-
-        """
-        if op == 'add':
-            LOG.info("Add dhcp options for node %(nodes)s" % {'nodes': names})
-        elif op == 'remove':
-            LOG.info(
-                "Remove dhcp options for node %(nodes)s" % {'nodes': names})
-        self.dhcp_service.update_opts(context, op, names, dhcp_opts)
-
-    @messaging.expected_exceptions(exception.NoFreeServiceWorker)
-    def check_dhcp_complete(self, context):
-        """RPC method to check the complete status for the request
-
-        :param context: an admin context.
-        :raises: NoFreeServiceWorker when there is no free worker to start
-                 async task.
-        """
-        LOG.info("Check the complete status for rqeust "
-                 "%s" % context.request_id)
-        return self.dhcp_service.check_complete(context)
 
     @messaging.expected_exceptions(exception.NoFreeServiceWorker,
                                    exception.DHCPProcessError)

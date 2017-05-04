@@ -22,21 +22,21 @@ data_dict = {
     states.POWER_COMMAND_RESET:
         "xyz.openbmc_project.State.Host.Transition.Reboot"}
 
-class OPENBMCPlugin(base.ControlInterface):
 
+class OPENBMCPlugin(base.ControlInterface):
     headers = {'Content-Type': 'application/json'}
 
-    def validate(self, node) :
+    def validate(self, node):
         bmc_address = node.control_info.get('bmc_address')
         bmcusername = node.control_info.get('bmc_username')
         bmcpassword = node.control_info.get('bmc_password')
-        if not bmc_address :
+        if not bmc_address:
             raise exception.MissingParameterValue(
                 _("OPENBMC address was not specified."))
-        if not bmcusername :
+        if not bmcusername:
             raise exception.MissingParameterValue(
                 _("OPENBMC username was not specified."))
-        if not bmcpassword :
+        if not bmcpassword:
             raise exception.MissingParameterValue(
                 _("OPENBMC password was not specified."))
 

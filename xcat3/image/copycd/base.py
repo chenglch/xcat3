@@ -37,7 +37,7 @@ def get_subclasses(clazz):
     modules = get_modules()
     classes = []
     for module in modules:
-        module = importutils.try_import('xcat3.image.os.%s' % module)
+        module = importutils.try_import('xcat3.image.copycd.%s' % module)
         for name, cls in inspect.getmembers(module):
             if inspect.isclass(cls) and issubclass(cls, clazz):
                 classes.append(cls)

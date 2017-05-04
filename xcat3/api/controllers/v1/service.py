@@ -45,6 +45,7 @@ class Service(base.APIBase):
     hostname = wsme.wsattr(wtypes.text)
     type = wsme.wsattr(wtypes.text)
     online = types.boolean
+    workers = wsme.wsattr(int, readonly=True)
 
     def __init__(self, **kwargs):
         self.fields = []

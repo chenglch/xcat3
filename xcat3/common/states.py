@@ -70,3 +70,4 @@ ERROR = 'error'
 DEPLOY_NONE = None
 DEPLOY_DHCP = 'dhcp'
 DEPLOY_NODESET = 'nodeset'
+DEPLOY_DONE = 'deployed'

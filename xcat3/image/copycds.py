@@ -1,12 +1,12 @@
 # coding=utf-8
 
+import os
 from oslo_config import cfg
-
 from xcat3.common import exception
 from xcat3.common.i18n import _
 from xcat3.common import utils
-from xcat3 import os
-from xcat3.image.os import base
+
+from xcat3.image.copycd import base
 
 CONF = cfg.CONF
 
@@ -15,7 +15,7 @@ def create(iso, image=None, install_dir=None):
     if not os.path.isfile(iso) or not os.access(iso, os.R_OK):
         raise exception.InvalidFile(name=iso)
     if not image:
-        image = os.path.split(os.path.basename(iso))[0]
+        image = os.path.splitext(os.path.basename(iso))[0]
     if not install_dir:
         install_dir = CONF.deploy.install_dir
     with utils.tempdir() as mntdir:

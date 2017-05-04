@@ -91,7 +91,7 @@ def _get_boot_device_map(virt_type):
     else:
         raise exception.InvalidParameterValue(_(
             "SSHPowerDriver '%(virt_type)s' is not a valid virt_type.") %
-            {'virt_type': virt_type})
+                                              {'virt_type': virt_type})
 
 
 def _get_command_sets(virt_type):
@@ -148,7 +148,7 @@ def _get_command_sets(virt_type):
     else:
         raise exception.InvalidParameterValue(_(
             "SSHPowerDriver '%(virt_type)s' is not a valid virt_type, ") %
-            {'virt_type': virt_type})
+                                              {'virt_type': virt_type})
 
 
 def _get_boot_device(ssh_obj, control_info):
@@ -377,7 +377,7 @@ def _get_hosts_name_for_node(ssh_obj, control_info):
                     continue
                 for node_mac in control_info['macs']:
                     if (utils.normalize_mac(host_mac)
-                            in utils.normalize_mac(node_mac)):
+                        in utils.normalize_mac(node_mac)):
                         LOG.debug("Found Mac address: %s", node_mac)
                         matched_name = node
                         break

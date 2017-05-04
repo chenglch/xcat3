@@ -4,8 +4,7 @@ Test Project
 This is just a experimental prototype for the technique discussion purpose. It
 leverage the basic framework of openstack, add support to process multiple
 resources per request. Currently, it only has several interface to monitor the
-performance of database and eventlet green thread. Do no care about the name
-**xcat3** as I can not come up with a appropriate name for it temporarily.
+performance of database and eventlet green thread.
 
 Process Service Model
 =====================
@@ -28,7 +27,8 @@ Pre-install steps
 
   apt-get update && apt-get install build-essential python-dev libssl-dev \
   python-pip libmysqlclient-dev libxml2-dev libxslt-dev libpq-dev libffi-dev \
-  gettext git rabbitmq-server mysql-server jq isc-dhcp-server ntp
+  gettext git rabbitmq-server mysql-server jq isc-dhcp-server ntp apache2 \
+  tftpd-hpa xinetd
 
 Installation
 ============
@@ -78,7 +78,33 @@ Start Service
 =============
 
 Edit ``etc/xcat3/xcat3.conf.sample`` to match your environment. Especially
-database connection string and the transport url string.
+database connection string and the transport url string. For example ::
+
+  [DEFAULT]
+    rpc_response_timeout = 3600
+    pecan_debug = true
+    transport_url = rabbit://xcat3:cluster@11.4.40.22:5672/
+    log_dir = /var/log/xcat3
+    [api]
+    host_ip = 11.4.40.22
+    port = 3010
+    max_limit = 6000
+    api_workers = 2 # suggest: the number of cpu cores
+    [database]
+    connection = mysql+pymysql://xcat3:cluster@11.4.40.22/xcat3?charset=utf8
+    backend = sqlalchemy
+
+    [conductor]
+    workers=2 # suggest: the number of cpu cores
+    host_ip = 11.4.40.22
+
+    [dhcp]
+    omapi_secret = IetCkIN8YY5OXn/g383w0xlgVSmmda5gZpDHjMf/d0DOjS++FfhVnCm8iGi2AsHL0MWATr+8S4oa8hEA93lbxw==
+    omapi_port = 7911
+    omapi_server = 127.0.0.1
+
+    [oslo_concurrency]
+    lock_path = /var/lib/xcat3
 
 Create schema for xcat3
 -----------------------
@@ -88,6 +114,22 @@ Create schema for xcat3
   mkdir -p xcat3/db/sqlalchemy/alembic/versions
   xcat3-dbsync --config-file etc/xcat3/xcat3.conf.sample create_schema
 
+Configure xinetd and apache2 on conductor node
+-----------------
+::
+
+  cp tools/config/xcat.conf.apache24 /etc/apache2/conf-available/xcat.conf.apach24
+  cd /etc/apache2/conf-enabled
+  ln -s ../conf-available/xcat.conf.apach24 /etc/apache2/conf-enabled/xcat.conf
+  service apache2 restart
+  cd -
+  cp tools/config/xinetd_tftp.conf /etc/xinetd.d/tftp
+  mkdir -p /var/lib/xcat3/tftpboot
+  cp tools/config/tftp_map-file.conf /var/lib/xcat3/tftpboot/map-file
+  service xinetd restart
+
+NOTE: Prepare the 'pxelinux.0' file in /var/lib/xcat3/tftpboot/ directory.
+
 Start xcat3 service
 -------------------
 ::
@@ -95,6 +137,12 @@ Start xcat3 service
   python /usr/local/bin/xcat3-api --config-file etc/xcat3/xcat3.conf.sample &
   python /usr/local/bin/xcat3-conductor --config-file etc/xcat3/xcat3.conf.sample &
   python /usr/local/bin/xcat3-network --config-file etc/xcat3/xcat3.conf.sample &
+
+Import OSImage
+----------------
+::
+
+  python /usr/local/bin/xcat3-copycds --config-file <xcat3.conf.sample> create </iso/ubuntu-16.04.1-server-amd64.iso>
 
 Command Line  Test Example
 ==========================
@@ -111,7 +159,7 @@ Create Nodes
 Create 9998 nodes like the following definition
 ::
 
-  root@c910f04x40k26:~/data# xcat3 show node9991
+  root@xxxxx:~/data# xcat3 show node9991
   [
     {
         "node": "node9991",
@@ -229,7 +277,7 @@ Update network configuration to enable dhcp service
 ::
 
   # network
-  xcat3 network-create c920 subnet=10.0.0.0 netmask=255.0.0.0 gateway=10.0.0.103
+  xcat3 network-create c920 subnet=11.0.0.0 netmask=255.0.0.0 gateway=11.0.0.103   dynamic_range=11.4.40.211-11.4.40.233 nameservers=11.0.0.103
 
 
 Make DHCP
@@ -255,3 +303,54 @@ Clean up the dhcp or nodeset contents
   real   	0m13.151s
   user   	0m0.165s
   sys    	0m0.065s
+
+Deploy OSImage on VM
+--------------------
+::
+
+    root@xxxxx# xcat3 create --mgt kvm --netboot pxe --arch x86_64 --nic \
+    mac=52:54:00:ee:29:78,ip=11.5.102.63,primary=True \
+    --control ssh_username=root,ssh_virt_type=virsh,ssh_address=11.5.102.1,ssh_key_filename=/root/.ssh/id_rsa \
+    xcat3test3
+
+    root@xxxxx# xcat3 show xcat3test3
+    [
+        {
+            "node": "xcat3test3",
+            "attr": {
+                "conductor_affinity": null,
+                "console_info": {},
+                "name": "xcat3test3",
+                "type": null,
+                "netboot": "pxe",
+                "state": null,
+                "control_info": {
+                    "ssh_username": "root",
+                    "ssh_virt_type": "virsh",
+                    "ssh_address": "11.5.102.1",
+                    "ssh_key_filename": "/root/.ssh/id_rsa"
+                },
+                "mgt": "kvm",
+                "reservation": null,
+                "arch": "x86_64",
+                "nics_info": {
+                    "nics": [
+                        {
+                            "ip": "11.5.102.63",
+                            "mac": "52:54:00:ee:29:78",
+                            "extra": {
+                                "primary": true
+                            },
+                            "uuid": "0256abbe-d8eb-4e08-9a16-43165b69dab9",
+                            "name": null
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+    root@xxxxx# xcat3 deploy xcat3test[1-3] --osimage Ubuntu-Server16.04.1-x86_64
+    root@xxxxx# xcat3 power xcat3test[1-3] on
+
+    # after about 15 minutes
+    root@xxxxx# ssh xcat3test3

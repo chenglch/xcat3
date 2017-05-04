@@ -7,7 +7,7 @@ from oslo_config import cfg
 import shutil
 
 from xcat3.common.i18n import _, _LE, _LI, _LW
-from xcat3.image.os import base
+from xcat3.image.copycd import base
 
 LOG = log.getLogger(__name__)
 CONF = cfg.CONF

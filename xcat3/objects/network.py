@@ -34,7 +34,8 @@ class Network(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         'netmask': object_fields.StringField(nullable=False),
         'gateway': object_fields.StringField(nullable=True),
         'nameservers': object_fields.StringField(nullable=True),
-        'ntpservers': object_fields.FlexibleDictField(nullable=True),
+        'ntpservers': object_fields.StringField(nullable=True),
+        'domain': object_fields.StringField(nullable=True),
         'dynamic_range': object_fields.StringField(nullable=True),
         'extra': object_fields.FlexibleDictField(nullable=True),
     }

@@ -1,6 +1,6 @@
 # coding=utf-8
 
-from xcat3.image.os import base
+from xcat3.image.copycd import base
 
 
 class RedhatImage(base.Image):

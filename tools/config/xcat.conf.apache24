@@ -1,0 +1,19 @@
+#
+# This configuration file allows a diskfull install to access the install images
+# via http.  It also allows the xCAT documentation to be accessed via
+# http://localhost/xcat-doc/
+# Updates to xCAT/xcat.conf should also be made to xCATsn/xcat.conf
+#
+AliasMatch ^/install/(.*)$ "/var/lib/xcat3/install/$1"
+AliasMatch ^/tftpboot/(.*)$ "/var/lib/xcat3/tftpboot/$1"
+
+<Directory "/var/lib/xcat3/tftpboott">
+    Options Indexes FollowSymLinks Includes MultiViews
+    AllowOverride None
+    Require all granted
+</Directory>
+<Directory "/var/lib/xcat3/install/">
+    Options Indexes FollowSymLinks Includes MultiViews
+    AllowOverride None
+    Require all granted
+</Directory>

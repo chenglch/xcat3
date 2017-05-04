@@ -1,3 +1,4 @@
+# Updated 2017 for xcat test purpose
 # Copyright 2016 Intel Corporation
 # Copyright 2013 Hewlett-Packard Development Company, L.P.
 # Copyright 2013 International Business Machines Corporation
@@ -36,12 +37,6 @@ opts = [
     cfg.StrOpt('omapi_server',
                default='127.0.0.1',
                help=_('IP address of OMAPI server.')),
-    cfg.IntOpt('dhcp_check_attempts',
-               default=15,
-               help=_('Number of attempts to grab a node lock.')),
-    cfg.IntOpt('dhcp_check_retry_interval',
-               default=1,
-               help=_('Seconds to sleep between node lock attempts.')),
 ]
 
 

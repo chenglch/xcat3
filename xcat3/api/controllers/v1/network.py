@@ -49,7 +49,8 @@ class Network(base.APIBase):
     netmask = wsme.wsattr(types.iptype)
     gateway = wsme.wsattr(types.iptype)
     nameservers = wsme.wsattr(types.iptype)
-    ntpservers = {wtypes.text: types.jsontype}
+    ntpservers = wsme.wsattr(wtypes.text)
+    domain = wsme.wsattr(wtypes.text)
     dynamic_range = wsme.wsattr(wtypes.text)
     extra = {wtypes.text: types.jsontype}
 

@@ -298,6 +298,10 @@ class NicNotFound(NotFound):
     _msg_fmt = _("Nic %(nic)s could not be found.")
 
 
+class FileNotFound(NotFound):
+    _msg_fmt = _("File %(file)s counld not be found.")
+
+
 class InvalidNicAttr(Invalid):
     _msg_fmt = _("No node is associated with Nic %(mac)s.")
 
@@ -328,6 +332,10 @@ class InvalidState(Conflict):
 
 class PowerStateFailure(InvalidState):
     _msg_fmt = _("Failed to set node power state to %(pstate)s.")
+
+
+class DeployStateFailure(InvalidState):
+    _msg_fmt = _("Failed to deploy node %(name)s.")
 
 
 class ThreadConflict(Conflict):

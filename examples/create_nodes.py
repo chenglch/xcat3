@@ -7,7 +7,7 @@ def gen_data(n=10):
     names = {"nodes": []}
     num = [0, 0]
 
-    for i in xrange(n):
+    for i in range(n):
         d = dict()
         num[0] = i / 256
         num[1] = i % 256
@@ -42,7 +42,7 @@ def gen_data(n=10):
                          'ssh_address': '10.5.102.1',
                          'ssh_key_filename': '/root/.ssh/id_rsa'}
     d['nics_info'] = {'nics': [
-        {'mac': '52:54:00:36:ac:b1', 'ip': '10.5.102.60', 'primary': True}]}
+        {'mac': '52:54:00:36:ac:b1', 'ip': '10.5.102.61', 'primary': True}]}
     nodes['nodes'].append(d)
     names['nodes'].append({'name':d['name']})
 
@@ -55,7 +55,20 @@ def gen_data(n=10):
                          'ssh_address': '10.5.102.1',
                          'ssh_key_filename': '/root/.ssh/id_rsa'}
     d['nics_info'] = {'nics': [
-        {'mac': '52:54:00:0b:0f:97', 'ip': '10.5.102.60', 'primary': True}]}
+        {'mac': '52:54:00:0b:0f:97', 'ip': '10.5.102.62', 'primary': True}]}
+    nodes['nodes'].append(d)
+    names['nodes'].append({'name': d['name']})
+
+    d = dict()
+    d['name'] = 'xcat3test3'
+    d['mgt'] = 'kvm'
+    d['netboot'] = 'pxe'
+    d['arch'] = 'x86_64'
+    d['control_info'] = {'ssh_username': 'root', 'ssh_virt_type': 'virsh',
+                         'ssh_address': '10.5.102.1',
+                         'ssh_key_filename': '/root/.ssh/id_rsa'}
+    d['nics_info'] = {'nics': [
+        {'mac': '52:54:00:ee:29:78', 'ip': '10.5.102.63', 'primary': True}]}
     nodes['nodes'].append(d)
     names['nodes'].append({'name': d['name']})
 
