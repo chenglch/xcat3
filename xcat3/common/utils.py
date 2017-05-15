@@ -586,3 +586,28 @@ def singleton(cls):
         return instances[cls]
 
     return _singleton
+
+
+def fill_result(result, names, message):
+    """Fill the message for given node names
+
+    Be carefull the different usage between api caller and conductor caller
+    api :utils.fill_result(result['nodes'], names, msg)
+    conductor: utils.fill_result(result, names, msg)
+
+    :param result: a dict contains result for nodes.
+    :param names: node names.
+    :param message: the return message for each node
+    """
+    for name in names:
+        result[name] = message
+
+
+def fill_dict_result(result, dict_ret):
+    """Fill the message for given dict
+
+    :param result: a dict contains result for nodes.
+    :param dict_ret: dict contains node and message
+    """
+    for k, v in six.iteritems(dict_ret):
+        result[k] = v

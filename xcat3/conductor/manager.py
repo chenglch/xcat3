@@ -26,6 +26,7 @@ import oslo_messaging as messaging
 from futurist import waiters
 
 from xcat3.common import exception
+from xcat3.common import utils
 from xcat3.conductor import base_manager
 from xcat3.conductor import task_manager
 from xcat3.conf import CONF
@@ -57,10 +58,6 @@ class ConductorManager(base_manager.BaseConductorManager):
         names_dict = dict((name, True) for name in names)
         nodes = [node for node in nodes if names_dict.has_key(node.name)]
         return names, nodes
-
-    def _fill_result(self, result, names, message):
-        for name in names:
-            result[name] = message
 
     def _process_nodes_worker(self, func, nodes, *args, **kwargs):
         """Wait the result from rpc call.
@@ -205,10 +202,6 @@ class ConductorManager(base_manager.BaseConductorManager):
         :raises: MissingParameterValue
 
         """
-        LOG.info("RPC provision called for nodes %(nodes)s. "
-                 "The desired new state is %(target)s.",
-                 {'nodes': str(names), 'target': target})
-
         def _provision(node, osimage, dhcp_opts, subnet=None):
             """One provision step for each node
             :param node: node to act on
@@ -238,6 +231,9 @@ class ConductorManager(base_manager.BaseConductorManager):
             boot_plugin.clean(node)
             node.state = xcat3_states.DEPLOY_NONE
 
+        LOG.info("RPC provision called for nodes %(nodes)s. "
+                 "The desired new state is %(target)s.",
+                 {'nodes': str(names), 'target': target})
         with task_manager.acquire(context, names, obj_info=['nics', ],
                                   purpose='nodes provision') as task:
             dhcp_opts = dict((name, {}) for name in names)
@@ -252,7 +248,7 @@ class ConductorManager(base_manager.BaseConductorManager):
                     objects.Node.update_nodes(nodes)
                 except Exception as e:
                     result = dict()
-                    self._fill_result(result, names, e.message)
+                    utils.fill_result(result, names, e.message)
                 return result
 
             if target == 'dhcp':
@@ -267,9 +263,10 @@ class ConductorManager(base_manager.BaseConductorManager):
             try:
                 dhcp.ISCDHCPService.update_opts(context, 'add', names,
                                                 dhcp_opts)
+                # update attributes in database
                 objects.Node.update_nodes(nodes)
             except Exception as e:
-                self._fill_result(result, names, e.message)
+                utils.fill_result(result, names, e.message)
 
             return result
 

@@ -67,22 +67,20 @@ def _wait_rpc_result(futures, names, result, json=True):
                                                        CONF.api.timeout)
     msg = "Timeout after waiting %(timeout)d seconds" % {
         "timeout": CONF.api.timeout}
-    for name in names:
-        result['nodes'][name] = msg
+    utils.fill_result(result['nodes'], names, msg)
     for r in done:
         nodes = getattr(r, 'nodes', None)
         if r.exception():
             if nodes:
-                for node in nodes:
-                    result['nodes'][node] = r.exception().message
+                utils.fill_result(result['nodes'], nodes,
+                                  r.exception().message)
             else:
                 result['error'] = r.exception().message
             if hasattr(r.exception(), 'code'):
                 result['errorcode'] = r.exception().code
         else:
             # Manager should return a dict result
-            for k, v in r.result().items():
-                result['nodes'][k] = v
+            utils.fill_dict_result(result['nodes'], r.result())
 
     return types.JsonType.validate(result) if json else result
 
@@ -111,15 +109,6 @@ def _filter_unavailable_nodes(names, share=False):
             result['nodes'][name] = msg
         names = filter(lambda n: n not in locked_names, names)
     return result, names
-
-
-def _fill_error_nodes(names, result, msg):
-    """Fill the result with unexpected error message
-        :param names:nodes names
-        :param result: status map about nodes
-    """
-    for name in names:
-        result['nodes'][name] = msg
 
 
 class Node(base.APIBase):
@@ -230,7 +219,9 @@ class NodeProvisionController(rest.RestController):
     def put(self, target, osimage=None, subnet=None, nodes=None):
         """Set the provision state of the nodes.
 
-        :param target: The desired  state of the node.
+        :param target: The desired state of the node.
+        :param osimage: The osimage to deploy.
+        :param subnet: the subnet used for deploying
         :param nodes: the name of nodes.
         :raises: ClientSideError (HTTP 409) if a provision operation is
                  already in progress.
@@ -267,12 +258,10 @@ class NodeProvisionController(rest.RestController):
             LOG.exception(_LE(
                 'Unexpected exception while activating dhcp service '
                 '%(err)s'), {'err': six.text_type(traceback.format_exc())})
-            _fill_error_nodes(names, result, e.message)
+            utils.fill_result(result['nodes'], names, e.message)
 
-        result = types.JsonType.validate(result)
-        url_args = '/'.join('states')
-        pecan.response.location = link.build_url('nodes', url_args)
-        return result
+        return types.JsonType.validate(result)
+
 
     @expose.expose(types.jsontype, wtypes.text, body=types.jsontype)
     def callback(self, name, action=None):
@@ -464,6 +453,7 @@ class NodesController(rest.RestController):
                        of the resource to be returned.
         """
         fields = ['name', ]
+        # TODO(chenglch): limit is not supported very well
         db_nodes = dbapi.get_node_list(limit=limit, sort_key=sort_key,
                                        sort_dir=sort_dir, fields=fields)
         results = {'nodes': []}

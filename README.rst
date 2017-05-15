@@ -277,7 +277,7 @@ Update network configuration to enable dhcp service
 ::
 
   # network
-  xcat3 network-create c920 subnet=11.0.0.0 netmask=255.0.0.0 gateway=11.0.0.103   dynamic_range=11.4.40.211-11.4.40.233 nameservers=11.0.0.103
+  xcat3 network-create c920 subnet=11.0.0.0 netmask=255.0.0.0 gateway=11.0.0.103 dynamic_range=11.4.40.211-11.4.40.233 nameservers=11.0.0.103
 
 
 Make DHCP
@@ -308,19 +308,18 @@ Deploy OSImage on VM
 --------------------
 ::
 
-    root@xxxxx# xcat3 create --mgt kvm --netboot pxe --arch x86_64 --nic \
-    mac=52:54:00:ee:29:78,ip=11.5.102.63,primary=True \
-    --control ssh_username=root,ssh_virt_type=virsh,ssh_address=11.5.102.1,ssh_key_filename=/root/.ssh/id_rsa \
-    xcat3test3
+    root@xxxxx# xcat3 create fakesshnode mgt=kvm netboot=pxe arch=x86_64 --nic \
+    mac=52:54:00:ee:29:89,ip=11.5.102.99,primary=True \
+    --control ssh_username=root,ssh_virt_type=virsh,ssh_address=11.5.102.1,ssh_key_filename=/root/.ssh/id_rsa
 
-    root@xxxxx# xcat3 show xcat3test3
+    root@xxxxx# xcat3 show fakesshnode
     [
         {
             "node": "xcat3test3",
             "attr": {
                 "conductor_affinity": null,
                 "console_info": {},
-                "name": "xcat3test3",
+                "name": "fakesshnode",
                 "type": null,
                 "netboot": "pxe",
                 "state": null,
@@ -337,7 +336,7 @@ Deploy OSImage on VM
                     "nics": [
                         {
                             "ip": "11.5.102.63",
-                            "mac": "52:54:00:ee:29:78",
+                            "mac": "52:54:00:ee:29:89",
                             "extra": {
                                 "primary": true
                             },
@@ -349,8 +348,8 @@ Deploy OSImage on VM
             }
         }
     ]
-    root@xxxxx# xcat3 deploy xcat3test[1-3] --osimage Ubuntu-Server16.04.1-x86_64
-    root@xxxxx# xcat3 power xcat3test[1-3] on
+    root@xxxxx# xcat3 deploy fakesshnode --osimage Ubuntu-Server16.04.1-x86_64
+    root@xxxxx# xcat3 power fakesshnode on
 
     # after about 15 minutes
-    root@xxxxx# ssh xcat3test3
+    root@xxxxx# ssh fakesshnode
