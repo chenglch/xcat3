@@ -40,7 +40,7 @@ opts = [
                       "host URL. If the API is operating behind a proxy, you "
                       "will want to change this to represent the proxy's URL. "
                       "Defaults to None.")),
-    cfg.IntOpt('api_workers',
+    cfg.IntOpt('workers',
                help=_('Number of workers for xca3 API service. '
                       'The default is equal to the number of CPUs available '
                       'if that can be determined, else a default worker '

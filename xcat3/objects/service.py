@@ -1,5 +1,4 @@
 # coding=utf-8
-#
 # Copyright 2013 Hewlett-Packard Development Company, L.P.
 #  Updated 2017 for xcat test purpose
 #

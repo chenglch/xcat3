@@ -1,5 +1,6 @@
 # Copyright (c) 2012 NTT DOCOMO, INC.
 # Copyright 2010 OpenStack Foundation
+# Updated 2017 for xcat test purpose
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may

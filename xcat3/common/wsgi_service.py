@@ -1,3 +1,4 @@
+# Updated 2017 for xcat test purpose
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
 # a copy of the License at
@@ -36,11 +37,11 @@ class WSGIService(service.ServiceBase):
         """
         self.name = name
         self.app = app.VersionSelectorApplication()
-        self.workers = (CONF.api.api_workers or
+        self.workers = (CONF.api.workers or
                         processutils.get_worker_count())
         if self.workers and self.workers < 1:
             raise exception.ConfigInvalid(
-                _("api_workers value of %d is invalid, "
+                _("workers value in [api] section of %d is invalid, "
                   "must be greater than 0.") % self.workers)
 
         self.server = wsgi.Server(CONF, name, self.app,

@@ -89,7 +89,7 @@ database connection string and the transport url string. For example ::
     host_ip = 11.4.40.22
     port = 3010
     max_limit = 6000
-    api_workers = 2 # suggest: the number of cpu cores
+    workers = 2 # suggest: the number of cpu cores
     [database]
     connection = mysql+pymysql://xcat3:cluster@11.4.40.22/xcat3?charset=utf8
     backend = sqlalchemy

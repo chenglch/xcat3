@@ -96,6 +96,7 @@ def _filter_unavailable_nodes(names, share=False):
 
     result = dict()
     msg = _("Could not be found.")
+    # For the performance consideration, use dbapi directly
     exist_names = dbapi.get_node_in(names, fields=['name', ])
     exist_names = [name[0] for name in exist_names]
     result['nodes'] = dict(
@@ -247,6 +248,7 @@ class NodeProvisionController(rest.RestController):
         if not names:
             return result
         context = pecan.request.context
+        # Get the rpc object which can transfer via rpc calls
         if subnet:
             subnet = objects.Network.get_by_name(context, subnet)
         if osimage:
@@ -490,6 +492,12 @@ class NodesController(rest.RestController):
             return new_node
 
         def singal_create(nodes, result):
+            """Create node one by one
+
+            :param nodes: the api nodes
+            :param result: a dict contains the return result
+            :return: json type result
+            """
             for node in nodes:
                 new_node = _create_object(node, result)
                 try:
@@ -501,10 +509,10 @@ class NodesController(rest.RestController):
             return result
 
         def bulk_create(nodes, result):
-            """Call the function for each node one by one
+            """Create nodes in bulk mode
 
-            :param func: the function called for each node
-            :param nodes: a list of API nodes
+            :param nodes: the api nodes
+            :param result: a dict contains the return result
             :return: json type result
             """
             names = [node.name for node in nodes]
@@ -527,6 +535,7 @@ class NodesController(rest.RestController):
         result = dict()
         result['nodes'] = dict()
         nodes = nodes.nodes
+        # 15 can be any number else
         if len(nodes) < 15:
             result = singal_create(nodes, result)
         else:
