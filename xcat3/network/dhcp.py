@@ -1,6 +1,7 @@
 import abc
 import errno
 import os
+import platform
 import socket
 import pypureomapi
 import subprocess
@@ -16,6 +17,7 @@ from xcat3.conf import CONF
 
 LOG = logging.getLogger(__name__)
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
+OS_DISTRO = platform.dist()[0]
 
 @six.add_metaclass(abc.ABCMeta)
 class DhcpBase(object):
@@ -54,7 +56,10 @@ class DhcpBase(object):
 class ISCDHCPService(DhcpBase):
     CONF_PATH = '/etc/dhcp/dhcpd.conf'
     PID_PATH = '/var/run/dhcpd.pid'
-    LEASE_PATH = '/var/lib/dhcp/dhcpd.leases'
+    if OS_DISTRO == 'Ubuntu':
+        LEASE_PATH = '/var/lib/dhcp/dhcpd.leases'
+    else:
+        LEASE_PATH = '/var/lib/dhcpd/dhcpd.leases'
     DHCP_DICT = {'66': 'server.server-name', '67': 'server.filename',
                  '12': 'host-name', '15': 'server.ddns-hostname'}
     dbapi = db_api.get_instance()

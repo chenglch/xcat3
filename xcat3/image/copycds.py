@@ -1,5 +1,7 @@
 # coding=utf-8
 
+from __future__ import print_function
+
 import os
 from oslo_config import cfg
 from xcat3.common import exception
@@ -34,8 +36,8 @@ def create(iso, image=None, install_dir=None):
 
 
 def upload(image):
-    print image
+    print (image)
 
 
 def delete(image):
-    print image
+    print (image)

@@ -1,5 +1,7 @@
 # coding=utf-8
 
+from __future__ import print_function
+
 import abc
 import errno
 import glob
@@ -64,9 +66,9 @@ class Image(object):
         os.chdir(self.mnt_dir)
         args1 = ['find', '.']
         args2 = ['cpio', '-vdump', dist_path]
-        print _(
+        print (_(
             "Copy image from %(mnt_dir)s to %(dist_path)s, please wait...") % {
-                  'mnt_dir': self.mnt_dir, 'dist_path': dist_path}
+                  'mnt_dir': self.mnt_dir, 'dist_path': dist_path})
         process_find = subprocess.Popen(args1, stdout=subprocess.PIPE,
                                         shell=False)
         # check the find output
@@ -109,7 +111,7 @@ class Image(object):
         """Create netboot image at install directory"""
 
     def upload(self, disk_info):
-        print 'Uploading image information...'
+        print ('Uploading image information...')
         dist_name = "%s%s" % (disk_info['product'], disk_info['version'])
         client = http_client.HttpClient()
         url = utils.get_api_url()
