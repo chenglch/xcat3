@@ -54,12 +54,9 @@ class DhcpBase(object):
 
 
 class ISCDHCPService(DhcpBase):
-    CONF_PATH = '/etc/dhcp/dhcpd.conf'
-    PID_PATH = '/var/run/dhcpd.pid'
-    if OS_DISTRO == 'Ubuntu':
-        LEASE_PATH = '/var/lib/dhcp/dhcpd.leases'
-    else:
-        LEASE_PATH = '/var/lib/dhcpd/dhcpd.leases'
+    CONF_PATH = '/etc/xcat3/dhcpd.conf'
+    PID_PATH = '/var/run/xcat3/dhcpd.pid'
+    LEASE_PATH = '/var/lib/xcat3/dhcpd.leases'
     DHCP_DICT = {'66': 'server.server-name', '67': 'server.filename',
                  '12': 'host-name', '15': 'server.ddns-hostname'}
     dbapi = db_api.get_instance()
@@ -76,11 +73,11 @@ class ISCDHCPService(DhcpBase):
         # TODO(chenglch): We do not hope to change the default configuration
         # file but 'apparmor' deny this.
 
-        # args = ['dhcpd', '-user', 'dhcpd', '-group', 'dhcpd', '-f', '-q', '-4',
-        #         '-pf', self.PID_PATH, '-cf', self.CONF_PATH, '-d', '-lf',
-        #         self.LEASE_PATH]
         args = ['dhcpd', '-user', 'dhcpd', '-group', 'dhcpd', '-f', '-q', '-4',
-                '-pf', self.PID_PATH]
+                '-pf', self.PID_PATH, '-cf', self.CONF_PATH, '-d', '-lf',
+                self.LEASE_PATH]
+        # args = ['dhcpd', '-user', 'dhcpd', '-group', 'dhcpd', '-f', '-q', '-4',
+        #         '-pf', self.PID_PATH]
         try:
             LOG.info("Execute command %s ." % ' '.join(args))
             self.dhcp_pobj = subprocess.Popen(args, stdout=subprocess.PIPE,

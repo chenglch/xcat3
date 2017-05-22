@@ -167,6 +167,7 @@ class OSImage(Base):
     type = Column(String(36), nullable=True)
     provmethod = Column(String(36), nullable=True)
     rootfstype = Column(String(36), nullable=True)
+    iso_path = Column(String(255), nullable=True)
 
 
 class Script(Base):

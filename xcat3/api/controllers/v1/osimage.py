@@ -51,6 +51,7 @@ class OSImage(base.APIBase):
     profile = wsme.wsattr(wtypes.text)
     provmethod = wsme.wsattr(wtypes.text)
     rootfstype = wsme.wsattr(wtypes.text)
+    iso_path = wsme.wsattr(wtypes.text)
 
     def __init__(self, **kwargs):
         self.fields = []
@@ -188,7 +189,7 @@ class OSImageController(rest.RestController):
         """
         context = pecan.request.context
         image_obj = objects.OSImage.get_by_name(context, name)
-        image_obj.destroy(name)
+        image_obj.destroy()
 
     @expose.expose(OSImage, types.name, body=[OSImagePatchType])
     def patch(self, name, patch):

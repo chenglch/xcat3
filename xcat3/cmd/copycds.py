@@ -10,19 +10,15 @@ from oslo_config import cfg
 from xcat3.common.i18n import _
 from xcat3.common import service
 from xcat3.conf import CONF
-from xcat3.image import copycds
-
+from xcat3.copycd import copycds
 
 class CopycdsCommand(object):
     def create(self):
         copycds.create(iso=CONF.command.iso, image=CONF.command.image,
                        install_dir=CONF.command.install)
 
-    def upload(self):
-        copycds.upload(CONF.command.image)
-
     def delete(self):
-        copycds.delete(CONF.command.image)
+        pass
 
 
 def add_command_parsers(subparsers):
@@ -37,13 +33,7 @@ def add_command_parsers(subparsers):
     parser.add_argument('--install', nargs='?',
                         help=_("Install direcotory of image"))
     parser.add_argument('iso', help="The iso file path for operation system")
-
-    parser = subparsers.add_parser('upload',
-                                   help=_(
-                                       "Upload netboot image to the service nodes."))
-    parser.add_argument('--image', nargs='?')
-    parser.set_defaults(func=command_object.upload)
-
+    # delete
     parser = subparsers.add_parser('delete',
                                    help=_("Delete netboot image."))
 
@@ -62,7 +52,7 @@ CONF.register_cli_opt(command_opt)
 def main():
     # this is hack to work with previous usage of xcat3-dbsync
     # pls change it to xcat3-dbsync upgrade
-    valid_commands = set(['create', 'upload', 'delete'])
+    valid_commands = set(['create', 'delete'])
     if not set(sys.argv) & valid_commands:
         sys.argv.append('create')
 

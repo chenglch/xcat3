@@ -3,17 +3,30 @@
 from __future__ import print_function
 
 import os
-from oslo_config import cfg
-from xcat3.common import exception
-from xcat3.common.i18n import _
-from xcat3.common import utils
+import shutil
 
-from xcat3.image.copycd import base
+from oslo_config import cfg
+from oslo_utils import fileutils
+
+from xcat3.common import exception
+from xcat3.common import utils
+from xcat3.copycd import base
 
 CONF = cfg.CONF
 
 
-def create(iso, image=None, install_dir=None):
+def _backup_iso(iso, install_dir, image):
+    iso_dir = os.path.join(install_dir, 'iso')
+    fileutils.ensure_tree(iso_dir)
+    backup_path = os.path.join(iso_dir, '%s.iso' % image)
+    if not os.path.exists(backup_path):
+        print(_("Copy iso from %(src)s to %(dst)s" % {'src': iso,
+                                                      'dst': backup_path}))
+        shutil.copy(iso, backup_path)
+    return os.path.relpath(iso_dir,install_dir)
+
+
+def create(iso, image=None, install_dir=None, upload=True):
     if not os.path.isfile(iso) or not os.access(iso, os.R_OK):
         raise exception.InvalidFile(name=iso)
     if not image:
@@ -31,12 +44,10 @@ def create(iso, image=None, install_dir=None):
             if not image_info:
                 continue
             image_obj.copycd(image_info)
-            image_obj.upload(image_info)
+            backup_path = _backup_iso(iso, install_dir, image)
+            if upload:
+                image_obj.upload(image_info, backup_path)
         utils.umount(mntdir)
-
-
-def upload(image):
-    print (image)
 
 
 def delete(image):

@@ -36,6 +36,7 @@ class OSImage(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         'type': object_fields.StringField(nullable=True),
         'provmethod': object_fields.StringField(nullable=True),
         'rootfstype': object_fields.StringField(nullable=True),
+        'iso_path': object_fields.StringField(nullable=True),
     }
 
     @classmethod

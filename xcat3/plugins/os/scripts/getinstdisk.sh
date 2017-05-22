@@ -136,10 +136,10 @@ if [ -z "$install_disk" ]; then
     # Check disks which had installed OS, or check all disks in /proc/partitions
     for disk in $disks; do
         # Get disk's information: WWN, PATH and DRIVER
-        disk_info=$(udevadm info --query=property --name=$disk)
-        output_for_wwn=$(IFS= ;echo $disk_info | grep '\<ID_WWN\>' | cut -d "=" -f2)
+        dist_info=$(udevadm info --query=property --name=$disk)
+        output_for_wwn=$(IFS= ;echo $dist_info | grep '\<ID_WWN\>' | cut -d "=" -f2)
         disk_wwn=$(echo $output_for_wwn | $utolcmd)
-        output_for_path=$(IFS= ;echo $disk_info | grep DEVPATH | cut -d "=" -f2)
+        output_for_path=$(IFS= ;echo $dist_info | grep DEVPATH | cut -d "=" -f2)
         disk_path=$(echo $output_for_path | $utolcmd)
         disk_driver=$(udevadm info --attribute-walk --name=$disk | grep DRIVERS| grep -v '""'| grep -v '"sd"'|
                     \head -n 1| sed -e 's/[^"]*"//' -e 's/"//' | $utolcmd)
