@@ -1,9 +1,6 @@
 import abc
-import errno
 import os
 import platform
-import socket
-import pypureomapi
 import subprocess
 import six
 
@@ -73,9 +70,8 @@ class ISCDHCPService(DhcpBase):
         # TODO(chenglch): We do not hope to change the default configuration
         # file but 'apparmor' deny this.
 
-        args = ['dhcpd', '-user', 'dhcpd', '-group', 'dhcpd', '-f', '-q', '-4',
-                '-pf', self.PID_PATH, '-cf', self.CONF_PATH, '-d', '-lf',
-                self.LEASE_PATH]
+        args = ['dhcpd', '-f', '-q', '-4', '-pf', self.PID_PATH, '-cf',
+                self.CONF_PATH, '-d', '-lf', self.LEASE_PATH]
         # args = ['dhcpd', '-user', 'dhcpd', '-group', 'dhcpd', '-f', '-q', '-4',
         #         '-pf', self.PID_PATH]
         try:
@@ -131,16 +127,18 @@ class ISCDHCPService(DhcpBase):
         utils.kill_child_process(pid, 5)
 
     def status(self):
-        try:
-            pypureomapi.Omapi(CONF.network.omapi_server,
-                              CONF.network.omapi_port, 'xcat_key',
-                              CONF.network.omapi_secret)
-        except socket.error as e:
-            if e.errno == errno.ECONNREFUSED:
+        if not os.path.isfile(self.PID_PATH) or not os.access(
+                self.PID_PATH, os.R_OK):
+            return False
+        with open(self.PID_PATH) as f:
+            try:
+                pid = int(f.read())
+            except ValueError:
                 return False
-            raise e
+        if pid == self.dhcp_pobj.pid:
+            return True
 
-        return True
+        return False
 
     def get_subnet_opts(self):
         return self.subnet_opts

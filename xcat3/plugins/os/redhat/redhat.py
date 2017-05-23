@@ -12,7 +12,7 @@ from xcat3.plugins import utils as plugin_utils
 CONF = cfg.CONF
 
 
-class UbuntuInterface(base.OSImageInterface):
+class RedhatInterface(base.OSImageInterface):
     """Interface for hardware control actions."""
     TMPL_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -27,9 +27,7 @@ class UbuntuInterface(base.OSImageInterface):
     def _get_pkg_list(self):
         """Return pkg list form pkg template"""
         with open(os.path.join(self.TMPL_DIR, 'compute.pkglist')) as f:
-            pkgs = f.read()
-        pkgs = pkgs.replace('\n', ' ')
-        return pkgs
+            return f.read()
 
     def build_os_boot_str(self, node, osimage):
         """Generate command line string for specific os image
@@ -40,10 +38,8 @@ class UbuntuInterface(base.OSImageInterface):
         """
         opts = []
         mirror = '%s%s/%s' % (osimage.distro, osimage.ver, osimage.arch)
-        opts.append('url=http://%s/install/autoinst/'
-                    '%s' % (CONF.conductor.host_ip,node.name))
-        opts.append('live-installer/net-image=http://%s/install/%s/install/'
-                    'filesystem.squashfs' %(CONF.conductor.host_ip, mirror))
-        opts.append('netcfg/choose_interface=%s' % node.mac)
-        opts.append('mirror/http/hostname=%s' % CONF.conductor.host_ip)
+        opts.append('inst.ks=http://%s/install/autoinst/'
+                    '%s' % (CONF.conductor.host_ip, node.name))
+        opts.append('inst.repo=http://%s/install/%s' % (CONF.conductor.host_ip,
+                                                        mirror))
         return ' '.join(opts)

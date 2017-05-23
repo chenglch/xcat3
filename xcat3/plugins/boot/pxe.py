@@ -53,11 +53,12 @@ class PXEBoot(base.BootInterface):
             '12': node.name, '15': node.name}
         return dhcp_opts
 
-    def nodeset(self, node, osimage):
+    def build_boot_conf(self, node, os_boot_str, osimage):
         """Build the configuration file and prepare kernal and initrd
 
         :param node: the node to act on.
-        :param osimage: the os info create by copycds
+        :param os_boot_str: the boot parameters from os plugin.
+        :param osimage: the os info create by copycds.
         :raises: MissingParameterValue if a required parameter is missing.
         """
         node_path = self._get_node_path(node)
@@ -85,11 +86,8 @@ class PXEBoot(base.BootInterface):
 
         opts = {'kernel': link_kernel, 'initrd': link_initrd,
                 'host_ip': CONF.conductor.host_ip,
-                'mac': node.mac,
                 'node': node.name,
-                'mirror': '%s%s/%s' % (osimage.distro, osimage.ver,
-                                       osimage.arch),
-                }
+                'os_boot_str': os_boot_str}
         self._create_config(node, opts)
         self._link_mac_configs(node)
 

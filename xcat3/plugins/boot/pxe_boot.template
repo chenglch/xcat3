@@ -1,5 +1,5 @@
 DEFAULT xCAT
 LABEL xCAT
  KERNEL {{ kernel }}
- APPEND initrd={{ initrd }} nofb utf8 auto url=http://{{host_ip}}/install/autoinst/{{node}} mirror/http/hostname={{host_ip}} netcfg/choose_interface={{mac}} locale=en_US priority=critical hostname={{node}} live-installer/net-image=http://{{host_ip}}/install/{{mirror}}/install/filesystem.squashfs console=tty0 console=ttyS0,115200
+ APPEND initrd={{ initrd }} nofb utf8 auto {{os_boot_str}} locale=en_US priority=critical hostname={{node}} console=tty0 console=ttyS0,115200
  IPAPPEND 2

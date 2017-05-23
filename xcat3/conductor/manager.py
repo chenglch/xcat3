@@ -221,10 +221,12 @@ class ConductorManager(base_manager.BaseConductorManager):
 
             node.state = xcat3_states.DEPLOY_NODESET
             node.conductor_affinity = self.service.id
-            boot_plugin.nodeset(node, osimage)
+
             os_plugin = self.plugins.get_osimage_plugin(osimage)
             os_plugin.validate(node)
-            os_plugin.render(node, osimage)
+            os_boot_str = os_plugin.build_os_boot_str(node, osimage)
+            os_plugin.build_template(node, osimage)
+            boot_plugin.build_boot_conf(node, os_boot_str, osimage)
 
         def _clean(node):
             boot_plugin = self.plugins.get_boot_plugin(node)

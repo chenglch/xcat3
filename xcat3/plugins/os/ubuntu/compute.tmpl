@@ -59,9 +59,9 @@ d-i partman-md/device_remove_md boolean true
 #create the /tmp/partitionfile based on the uefi or legacy bios
 d-i partman/early_command string \
 { \
-    wget http://{{host_ip}}/{{install_dir}}/scripts/getinstdisk; \
-    chmod u+x getinstdisk; \
-    ./getinstdisk; \
+    wget http://{{host_ip}}/{{install_dir}}/scripts/getinstdisk.sh; \
+    chmod u+x getinstdisk.sh; \
+    ./getinstdisk.sh; \
     debconf-set partman-auto/disk "$(cat /tmp/xcat.install_disk)"; \
 } >>/tmp/pre-install.log 2>&1
 d-i partman-auto/expert_recipe_file string /tmp/partitionfile
@@ -128,9 +128,8 @@ xserver-xorg xserver-xorg/config/monitor/mode-list \
   select 1024x768 @ 60 Hz
 
 d-i preseed/late_command string \
-     mkdir -p /target/var/log/xcat3/; \
-     mkdir -p /target/tmp; \
-     wget "http://{{host_ip}}/{{install}}/scripts/{{node}}.py" -P /target/tmp; \
+     mkdir -p /target/var/log/xcat3/ /target/tmp; \
+     wget "http://{{host_ip}}/{{install_dir}}/scripts/{{node}}.py" -P /target/tmp; \
      { \
      echo "Running preseeding late_command Installation script..."; \
      mount -o bind /proc /target/proc -t proc; \

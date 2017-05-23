@@ -50,11 +50,12 @@ class BootInterface(base.BaseInterface):
         """
 
     @abc.abstractmethod
-    def nodeset(self, node, osimage):
+    def build_boot_conf(self, node, os_boot_str, osimage):
         """Build the configuration file and prepare kernal and initrd
 
         :param node: the node to act on.
-        :param osimage: the os info create by copycds
+        :param os_boot_str: the boot parameters from os plugin.
+        :param osimage: the os info create by copycds.
         :raises: MissingParameterValue if a required parameter is missing.
         """
 

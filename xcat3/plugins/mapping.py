@@ -5,6 +5,7 @@ from xcat3.plugins.control import ssh
 from xcat3.plugins.boot import pxe
 from xcat3.plugins.os import base as os_base
 from xcat3.plugins.os.ubuntu import ubuntu
+from xcat3.plugins.os.redhat import redhat
 
 LOG = log.getLogger(__name__)
 
@@ -17,6 +18,7 @@ class PluginMap(object):
     boot_map['pxe'] = pxe.PXEBoot()
     os_map = dict()
     os_map['ubuntu'] = ubuntu.UbuntuInterface()
+    os_map['rhels'] = redhat.RedhatInterface()
 
     @classmethod
     def get_control_plugin(cls, node):
