@@ -129,12 +129,12 @@ xserver-xorg xserver-xorg/config/monitor/mode-list \
 
 d-i preseed/late_command string \
      mkdir -p /target/var/log/xcat3/ /target/tmp; \
-     wget "http://{{host_ip}}/{{install_dir}}/scripts/{{node}}.py" -P /target/tmp; \
+     wget "http://{{host_ip}}/{{install_dir}}/scripts/post.py" -P /target/tmp; \
      { \
      echo "Running preseeding late_command Installation script..."; \
      mount -o bind /proc /target/proc -t proc; \
      mount -o bind /dev /target/dev; \
      mount -o bind /dev/pts /target/dev/pts -t devpts; \
      mount -o bind /sys /target/sys; \
-     chroot /target python /tmp/{{node}}.py {{api_ip}} {{api_port}} {{node}}; \
+     chroot /target python /tmp/post.py {{api_ip}} {{api_port}} {{node}}; \
      } >>/target/var/log/xcat3/post.log 2>&1

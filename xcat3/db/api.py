@@ -286,8 +286,7 @@ class Connection(object):
         """Get image from name"""
 
     @abc.abstractmethod
-    def get_image_list(self, filters=None, limit=None, sort_key=None,
-                       sort_dir=None):
+    def get_image_list(self):
         """Get image list"""
 
     @abc.abstractmethod

@@ -91,6 +91,7 @@ class Node(Base):
     state = Column(String(16), nullable=True)
     task_action = Column(String(20), nullable=True)
     osimage_id = Column(Integer, ForeignKey('osimage.id'), nullable=True)
+    passwd_id = Column(Integer, ForeignKey('passwd.id'),nullable=True)
     scripts_names = Column(String(255), nullable=True)
     control_info = Column(db_types.JsonEncodedDict, nullable=True)
     console_info = Column(db_types.JsonEncodedDict, nullable=True)
@@ -167,7 +168,20 @@ class OSImage(Base):
     type = Column(String(36), nullable=True)
     provmethod = Column(String(36), nullable=True)
     rootfstype = Column(String(36), nullable=True)
-    iso_path = Column(String(255), nullable=True)
+    orig_name = Column(String(255), nullable=True)
+
+
+class Passwd(Base):
+    """Represents password."""
+    __tablename__ = 'passwd'
+    __table_args__ = (
+        schema.UniqueConstraint('key', name='uniq_passwd0key'),
+        table_args())
+    id = Column(Integer, primary_key=True)
+    key = Column(String(16), nullable=False)
+    username = Column(String(36), nullable=True)
+    password = Column(String(255), nullable=True)
+    crypt_method = Column(String(16), nullable=True)
 
 
 class Script(Base):

@@ -166,16 +166,80 @@ class ConductorAPI(object):
         :param node: the callback node
         """
         conductor = self.dbapi.get_service_from_id(id=conductor_id)
+        if not conductor:
+            reason = (_('Conductor %(id)s is not registered') % conductor_id)
+            raise exception.NoValidHost(reason=reason)
         return '%s.%s' % (self.topic, conductor.hostname.encode('utf-8'))
 
+    def get_topic_for_affinity(self, names, result):
+        # nodes [('<node_name>', affinity_id),]
+        nodes = self.dbapi.get_node_affinity_in(names)
+        conductors = self.dbapi.get_services(type='conductor')
+        if not conductors:
+            reason = (_('No conductor service registered'))
+            raise exception.NoValidHost(reason=reason)
+        cond_dict = dict((c.id, '%s.%s' % (self.topic,
+            c.hostname.encode('utf-8'))) for c in conductors)
+        topic_dict = dict(('%s.%s' % (self.topic, c.hostname.encode('utf-8')),
+                           {'nodes': [], 'workers': c.workers}) for c in
+                          conductors)
+        default_topic = '%s.%s' % (self.topic,
+                                   conductors[0].hostname.encode('utf-8'))
+        for node in nodes:
+            if node[1]:
+                if cond_dict.has_key(node[1]):
+                    topic = cond_dict[node[1]]
+                else:
+                    result['nodes'][node[0]] = _(
+                        "Conductor %s could not be found" % node[1])
+                    continue
+            else:
+                topic = default_topic
+            topic_dict[topic]['nodes'].append(node[0])
+        return topic_dict
 
     def spawn_rpc_worker(self, func, *args, **kwargs):
+        """Start greensthread for every conductor host
+
+        :param func: function to run in the greenthread
+        :param affinity: boolean value indicate whether to run rpc request on
+                         specific host
+        :return result:  result dict contains the return status for each node
+        :raises: InvalidParameterValue
+        """
+        if not kwargs.has_key('names'):
+            raise exception.InvalidParameterValue(
+                _("Invalid parameter kwargs %(kwargs)s") % {
+                    'kwargs': str(kwargs)})
+        topic_dict = self.get_topic_for(kwargs.pop('names'))
+
+        futures = []
+        for topic, node_info in topic_dict.items():
+            nodes = node_info['nodes']
+            workers = node_info['workers']
+            cctxt = self.client.prepare(topic=topic or self.topic,
+                                        version='1.0')
+            temp = self.spawn_worker(func, cctxt, workers=workers, names=nodes,
+                                     *args, **kwargs)
+            futures.extend(temp)
+
+        return futures
+
+    def spawn_affinity_worker(self, result, func, *args, **kwargs):
+        """Start greensthread for every conductor host
+
+        :param func: function to run in the greenthread
+        :param affinity: boolean value indicate whether to run rpc request on
+                         specific host
+        :return result:  result dict contains the return status for each node
+        :raises: InvalidParameterValue
+        """
         if not kwargs.has_key('names'):
             raise exception.InvalidParameterValue(
                 _("Invalid parameter kwargs %(kwargs)s") % {
                     'kwargs': str(kwargs)})
 
-        topic_dict = self.get_topic_for(kwargs.pop('names'))
+        topic_dict = self.get_topic_for_affinity(kwargs.pop('names'), result)
         futures = []
         for topic, node_info in topic_dict.items():
             nodes = node_info['nodes']
@@ -248,14 +312,13 @@ class ConductorAPI(object):
         """Change nodes's provision state.
 
         Synchronously, acquire lock and start the conductor background task
-        to change power state of a node.
+        to deploy nodes.
 
         :param context: request context.
         :param names: names of nodes.
         :param target: desired power state
         :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
-
         """
 
         def _provision(cctxt, names, target, osimage, subnet=None):
@@ -264,6 +327,23 @@ class ConductorAPI(object):
 
         return self.spawn_rpc_worker(_provision, names=names, target=target,
                                      osimage=osimage, subnet=subnet)
+
+    def clean(self, context, result, names):
+        """Clean up the files and configuration while depoying.
+
+        Synchronously, acquire lock and start the conductor background task
+        to clean the env.
+
+        :param context: request context.
+        :param names: names of nodes.
+        :raises: NoFreeServiceWorker when there is no free worker to start
+                 async task.
+        """
+        def _clean(cctxt, names):
+            return cctxt.call(context, 'clean', names=names)
+
+        self.dbapi.destroy_dhcp(names)
+        return self.spawn_affinity_worker(result, _clean, names=names)
 
     def get_boot_device(self, context, names):
         """Get a node's boot device

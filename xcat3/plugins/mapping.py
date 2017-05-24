@@ -17,6 +17,7 @@ class PluginMap(object):
     boot_map = dict()
     boot_map['pxe'] = pxe.PXEBoot()
     os_map = dict()
+    os_map['base'] = os_base.BaseOSImage()
     os_map['ubuntu'] = ubuntu.UbuntuInterface()
     os_map['rhels'] = redhat.RedhatInterface()
 

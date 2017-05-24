@@ -45,6 +45,8 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         'control_info': object_fields.FlexibleDictField(nullable=True),
         'console_info': object_fields.FlexibleDictField(nullable=True),
         'conductor_affinity': object_fields.IntegerField(nullable=True),
+        'osimage_id': object_fields.IntegerField(nullable=True),
+        'passwd_id': object_fields.IntegerField(nullable=True),
     }
 
     @classmethod
@@ -82,10 +84,6 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         node = cls._from_db_object(cls(context), db_node)
         return node
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable_classmethod
     @classmethod
     def get_by_name(cls, context, name):
         """Find a node based on name and return a Node object.

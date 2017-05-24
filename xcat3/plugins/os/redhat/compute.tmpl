@@ -153,9 +153,9 @@ reboot
 %end
 %post
 mkdir -p /var/log/xcat3/ /tmp
-wget "http://{{host_ip}}/{{install_dir}}/scripts/{{node}}.py" -P /tmp
+wget "http://{{host_ip}}/{{install_dir}}/scripts/post.py" -P /tmp
 {
     echo "Running Kickstart Post-Installation script..."
-    python /tmp/{{node}}.py {{api_ip}} {{api_port}} {{node}};
+    python /tmp/post.py {{api_ip}} {{api_port}} {{node}};
 } >>/var/log/xcat3/post.log 2>&1
 %end

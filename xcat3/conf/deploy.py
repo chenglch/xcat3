@@ -24,7 +24,11 @@ opts = [
                help=_('The install directory to place images')),
     cfg.StrOpt('tftp_dir',
                default='/var/lib/xcat3/tftpboot',
-               help=_('The tftp directory to place images'))
+               help=_('The tftp directory to place images')),
+    cfg.IntOpt('copycd_timeout',
+               default=1800,
+               help = (_('Maxinum time (in seconds) to wait for the completion'
+                         ' of copycd process'))),
 ]
 
 

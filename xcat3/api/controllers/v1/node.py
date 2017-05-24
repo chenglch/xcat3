@@ -57,17 +57,15 @@ dbapi = db_api.get_instance()
 def _wait_rpc_result(futures, names, result, json=True):
     """Wait the result from rpc call.
 
-
     :param futures: api worker objects
     :param nodes: node list for rpc request
     :param result: node dict for the result
-    :return: json type result
+    :param json: if True, the the result will be send back through rest api,
+                 if it is just intermediate value, set False
+    :return: json type result,
     """
     done, not_done = pecan.request.rpcapi.wait_workers(futures,
                                                        CONF.api.timeout)
-    msg = "Timeout after waiting %(timeout)d seconds" % {
-        "timeout": CONF.api.timeout}
-    utils.fill_result(result['nodes'], names, msg)
     for r in done:
         nodes = getattr(r, 'nodes', None)
         if r.exception():
@@ -81,6 +79,12 @@ def _wait_rpc_result(futures, names, result, json=True):
         else:
             # Manager should return a dict result
             utils.fill_dict_result(result['nodes'], r.result())
+
+    msg = "Timeout after waiting %(timeout)d seconds" % {
+        "timeout": CONF.api.timeout}
+    for r in not_done:
+        nodes = getattr(r, 'nodes', None)
+        utils.fill_result(result['nodes'], nodes, msg)
 
     return types.JsonType.validate(result) if json else result
 
@@ -134,6 +138,8 @@ class Node(base.APIBase):
     console_info = {wtypes.text: types.jsontype}
     nics_info = {wtypes.text: types.jsontype}
     conductor_affinity = workers = wsme.wsattr(int, readonly=True)
+    osimage_id = wsme.wsattr(int, readonly=True)
+    passwd_id = wsme.wsattr(int, readonly=True)
 
     def __init__(self, **kwargs):
         self.fields = []
@@ -244,10 +250,15 @@ class NodeProvisionController(rest.RestController):
             subnet = objects.Network.get_by_name(context, subnet)
         if osimage:
             osimage = objects.OSImage.get_by_name(context, osimage)
-        futures = pecan.request.rpcapi.provision(context, names,
-                                                 target=target,
-                                                 osimage=osimage,
-                                                 subnet=subnet)
+
+        if not target.startswith('un_'):
+            futures = pecan.request.rpcapi.provision(context, names,
+                                                     target=target,
+                                                     osimage=osimage,
+                                                     subnet=subnet)
+        else:
+            futures = pecan.request.rpcapi.clean(context, result, names)
+
         result = _wait_rpc_result(futures, names, result, False)
         try:
             # As rpc result from conductor nodes has came back, the async calls

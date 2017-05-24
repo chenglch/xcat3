@@ -36,14 +36,14 @@ class OSImage(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         'type': object_fields.StringField(nullable=True),
         'provmethod': object_fields.StringField(nullable=True),
         'rootfstype': object_fields.StringField(nullable=True),
-        'iso_path': object_fields.StringField(nullable=True),
+        'orig_name': object_fields.StringField(nullable=True),
     }
 
     @classmethod
     def get_by_id(cls, context, image_id):
         """Find a network based on its integer id and return a OSImage object.
 
-        :param network_id: the id of a image.
+        :param image_id: the id of a image.
         :returns: a :class:`OSImage` object.
         """
         db_image = cls.dbapi.get_image_by_id(image_id)
@@ -62,21 +62,14 @@ class OSImage(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         return image
 
     @classmethod
-    def list(cls, context, limit=None, sort_key=None, sort_dir=None,
-             filters=None, fields=None):
+    def list(cls, context):
         """Return a list of OSImage objects.
 
         :param context: Security context.
-        :param limit: maximum number of resources to return in a single result.
-        :param sort_key: column to sort results by.
-        :param sort_dir: direction to sort. "asc" or "desc".
-        :param filters: Filters to apply.
         :returns: a list of :class:`OSImage` object.
 
         """
-        db_images = cls.dbapi.get_image_list(filters=filters, limit=limit,
-                                             sort_key=sort_key,
-                                             sort_dir=sort_dir)
+        db_images = cls.dbapi.get_image_list()
         images = cls._from_db_object_list(context, db_images)
         return images
 

@@ -26,13 +26,13 @@ class BootInterface(base.BaseInterface):
         :raises: MissingParameterValue if a required parameter is missing.
         """
         mac = plugin_utils.get_primary_mac_address(node)
-        if not mac:
+        if mac is None:
             raise exception.MissingParameterValue(
                 _("Node %s does not have any nic with mac address associated "
                   "with it.") % node.name)
 
         ip = plugin_utils.get_primary_ip_address(node)
-        if not ip:
+        if ip is None:
             raise exception.MissingParameterValue(
                 _("Node %s does not have any nic with ip address associated "
                   "with it.") % node.name)
@@ -77,11 +77,11 @@ class BootInterface(base.BaseInterface):
     def _get_mac_path(self, node, delimiter='-'):
         """Convert a MAC address into a PXE config file name.
 
-            :param mac: A MAC address string in the format xx:xx:xx:xx:xx:xx.
-            :param delimiter: The MAC address delimiter. Defaults to dash ('-').
-            :param client_id: client_id indicate InfiniBand port.
-                              Defaults is None (Ethernet)
-            :returns: the path to the config file.
+        :param mac: A MAC address string in the format xx:xx:xx:xx:xx:xx.
+        :param delimiter: The MAC address delimiter. Defaults to dash ('-').
+        :param client_id: client_id indicate InfiniBand port.
+                          Defaults is None (Ethernet)
+        :returns: the path to the config file.
         """
         mac = plugin_utils.get_primary_mac_address(node)
         mac_file_name = mac.replace(':', delimiter).lower()
@@ -92,10 +92,13 @@ class BootInterface(base.BaseInterface):
     def _get_config_path(self, node):
         return os.path.join(self.CONFIG_DIR, node.name, 'config')
 
+    @abc.abstractmethod
     def _get_osimage_path(self, osimage):
-        return os.path.join(CONF.deploy.tftp_dir, 'images',
-                            '%s%s' % (osimage.distro, osimage.ver),
-                            osimage.arch)
+        """Get the osimage path for boot plugin
+
+        :param osimage: the os image object create by copycds.
+        :returns: the directory path
+        """
 
     def _link_mac_configs(self, node):
         """Link each MAC address with the PXE configuration file.

@@ -268,11 +268,6 @@ class NotFound(XCAT3Exception):
     code = http_client.NOT_FOUND
 
 
-class TemporaryFailure(XCAT3Exception):
-    _msg_fmt = _("Resource temporarily unavailable, please retry.")
-    code = http_client.SERVICE_UNAVAILABLE
-
-
 class NoFreeAPIWorker(TemporaryFailure):
     _msg_fmt = _('Requested action cannot be performed due to lack of free '
                  'api workers.')
@@ -341,3 +336,7 @@ class DeployStateFailure(InvalidState):
 class ThreadConflict(Conflict):
     _msg_fmt = _(
         "There is anonther thread is running for this job, exit %(thread)s.")
+
+class TimeoutException(XCAT3Exception):
+    _msg_fmt = _("Time out occurs after running func %(func) for %(time)d "
+                 "seconds")

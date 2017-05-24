@@ -589,9 +589,10 @@ def singleton(cls):
 
 
 def fill_result(result, names, message):
-    """Fill the message for given node names
+    """Fill the message for given node names if message is not exist
 
-    Be carefull the different usage between api caller and conductor caller
+    Be carefull about the different usage between api caller and conductor
+    caller.
     api :utils.fill_result(result['nodes'], names, msg)
     conductor: utils.fill_result(result, names, msg)
 
@@ -600,7 +601,7 @@ def fill_result(result, names, message):
     :param message: the return message for each node
     """
     for name in names:
-        result[name] = message
+        result[name] = result.get(name) or message
 
 
 def fill_dict_result(result, dict_ret):

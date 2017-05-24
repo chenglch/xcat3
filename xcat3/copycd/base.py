@@ -127,21 +127,23 @@ class Image(object):
             self._copy_to_tftp(kernel_path, initrd_path, tftp_kernel_path,
                                tftp_initrd_path)
 
-    def upload(self, dist_info, backup_path):
+    def upload(self, dist_info, path):
         """Upload image information to database"""
         print('Uploading image information...')
         dist_name = "%s%s" % (dist_info['product'], dist_info['version'])
         osimage_name = "%s-%s" % (dist_name, dist_info['arch'])
         try:
             image_obj = objects.OSImage.get_by_name(None, osimage_name)
-            image_obj.destroy()
+            for k, v in six.iteritems(dist_info):
+                setattr(image_obj, k, v)
+            image_obj.orig_name = path
+            image_obj.save()
         except exception.OSImageNotFound:
-            pass
-        image_dict = {"name": osimage_name,
-                      "arch": dist_info['arch'],
-                      "ver": dist_info['version'],
-                      "distro": dist_info['product'],
-                      "iso_path": backup_path}
+            image_dict = {"name": osimage_name,
+                          "arch": dist_info['arch'],
+                          "ver": dist_info['version'],
+                          "distro": dist_info['product'],
+                          "orig_name": path}
 
-        new_image = objects.OSImage(None, **image_dict)
-        new_image.create()
+            new_image = objects.OSImage(None, **image_dict)
+            new_image.create()

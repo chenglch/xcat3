@@ -29,6 +29,11 @@ class PXEBoot(base.BootInterface):
     def _get_node_path(self, node):
         return os.path.join(CONF.deploy.tftp_dir, 'nodes', node.name)
 
+    def _get_osimage_path(self, osimage):
+        return os.path.join(CONF.deploy.tftp_dir, 'images',
+                            '%s%s' % (osimage.distro, osimage.ver),
+                            osimage.arch)
+
     def clean(self, node):
         mac_path = self._get_mac_path(node)
         utils.unlink_without_raise(mac_path)
@@ -58,7 +63,7 @@ class PXEBoot(base.BootInterface):
 
         :param node: the node to act on.
         :param os_boot_str: the boot parameters from os plugin.
-        :param osimage: the os info create by copycds.
+        :param osimage: the os image object create by copycds.
         :raises: MissingParameterValue if a required parameter is missing.
         """
         node_path = self._get_node_path(node)

@@ -51,7 +51,7 @@ class OSImage(base.APIBase):
     profile = wsme.wsattr(wtypes.text)
     provmethod = wsme.wsattr(wtypes.text)
     rootfstype = wsme.wsattr(wtypes.text)
-    iso_path = wsme.wsattr(wtypes.text)
+    orig_name = wsme.wsattr(wtypes.text)
 
     def __init__(self, **kwargs):
         self.fields = []
@@ -91,37 +91,20 @@ class OSImageCollection(collection.Collection):
         self._type = 'images'
 
     @staticmethod
-    def convert_with_links(images, limit=50, url=None, fields=None,
-                           **kwargs):
+    def convert_with_links(images, url=None, fields=None,**kwargs):
         collection = OSImageCollection()
         collection.images = [OSImage.convert_with_links(n, fields=fields)
                              for n in images]
-        collection.next = collection.get_next(limit, url=url, **kwargs)
+        collection.next = collection.get_next(None, url=url, **kwargs)
         return collection
 
 
 class OSImageController(rest.RestController):
     invalid_sort_key_list = ['name']
 
-    def _get_images_collection(self, limit=1000, sort_key='id',
-                               sort_dir='asc', fields=None):
-
-        limit = api_utils.validate_limit(limit)
-        sort_dir = api_utils.validate_sort_dir(sort_dir)
-
-        if sort_key in self.invalid_sort_key_list:
-            raise exception.InvalidParameterValue(
-                _("The sort_key value %(key)s is an invalid field for "
-                  "sorting") % {'key': sort_key})
-        filters = {}
-        images = objects.OSImage.list(pecan.request.context, limit,
-                                      sort_key=sort_key, sort_dir=sort_dir,
-                                      filters=filters, fields=None)
-
-        parameters = {'sort_key': sort_key, 'sort_dir': sort_dir}
-        return OSImageCollection.convert_with_links(images, limit,
-                                                    fields=fields,
-                                                    **parameters)
+    _custom_actions = {
+        'get_by_id': ['GET']
+    }
 
     def _update_changed_fields(self, image, image_obj):
         """Update rpc_image based on changed fields in a image.
@@ -136,6 +119,12 @@ class OSImageController(rest.RestController):
                 patch_val = None
             if image_obj[field] != patch_val:
                 image_obj[field] = patch_val
+
+    @expose.expose(OSImage, int, types.listtype)
+    def get_by_id(self, id, fields=None):
+        context = pecan.request.context
+        image_obj = objects.OSImage.get_by_id(context, id)
+        return OSImage.convert_with_links(image_obj, fields=fields)
 
     @expose.expose(OSImage, types.name, types.listtype)
     def get_one(self, name, fields=None):
@@ -160,8 +149,8 @@ class OSImageController(rest.RestController):
         """
         if fields is None:
             fields = ['name']
-        return self._get_images_collection(limit, sort_key, sort_dir,
-                                           fields=fields)
+        images = objects.OSImage.list(pecan.request.context)
+        return OSImageCollection.convert_with_links(images)
 
     @expose.expose(types.jsontype, body=OSImage,
                    status_code=http_client.CREATED)

@@ -28,15 +28,6 @@ opts = [
                default=3660,
                help=_('Maximum time (in seconds) to process task in a worker'
                       'thread.')),
-    cfg.StrOpt('omapi_secret',
-               default='IetCkIN8YY5OXn/g383w0xlgVSmmda5gZpDHjMf/d0DOjS++FfhVnCm8iGi2AsHL0MWATr+8S4oa8hEA93lbxw==',
-               help=_('OMAPI key generated with dnssec-keygen command.')),
-    cfg.IntOpt('omapi_port',
-               default=7911,
-               help=_('OMAPI port to manage isc-dhcp-server.')),
-    cfg.StrOpt('omapi_server',
-               default='127.0.0.1',
-               help=_('IP address of OMAPI server.')),
 ]
 
 

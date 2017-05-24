@@ -22,6 +22,7 @@ import six
 import threading
 
 from oslo_db import exception as db_exc
+from oslo_db.sqlalchemy import engines
 from oslo_db.sqlalchemy import enginefacade
 from oslo_db.sqlalchemy import utils as db_utils
 from oslo_log import log
@@ -246,6 +247,13 @@ class Connection(api.Connection):
                 node_names))
         if filters and 'reservation' in filters:
             query = query.filter_by(reservation=None)
+        return query.all()
+
+    def get_node_affinity_in(self, node_names):
+        query = model_query(models.Node)
+        query = query.with_entities(models.Node.name,
+                                    models.Node.conductor_affinity).filter(
+            models.Node.name.in_(node_names))
         return query.all()
 
     def reserve_nodes(self, tag, node_names):
@@ -525,12 +533,10 @@ class Connection(api.Connection):
             session.add_all(node_models)
 
     def destroy_dhcp(self, names):
-        with _session_for_write():
-            query = model_query(models.DHCP).filter(
+        with _session_for_write() as session:
+            stmt = models.DHCP.__table__.delete().where(
                 models.DHCP.name.in_(names))
-            nodes = query.all()
-            if nodes:
-                query.delete(synchronize_session=False)
+            session.execute(stmt)
 
     def get_services(self, type='conductor', check_limit=True):
         interval = CONF.heartbeat_timeout
@@ -638,11 +644,9 @@ class Connection(api.Connection):
         except NoResultFound:
             raise exception.OSImageNotFound(image=name)
 
-    def get_image_list(self, filters=None, limit=None, sort_key=None,
-                       sort_dir=None):
+    def get_image_list(self):
         query = model_query(models.OSImage)
-        return _paginate_query(models.OSImage, limit, sort_key, sort_dir,
-                               query)
+        return query.all()
 
     def create_image(self, values):
         image = models.OSImage()

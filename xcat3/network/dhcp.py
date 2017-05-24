@@ -213,9 +213,8 @@ class ISCDHCPService(DhcpBase):
 
     def _global_cfg(self):
         template = os.path.join(BASEDIR, 'dhcp_global.template')
-        opts = {'omapi_secret': CONF.network.omapi_secret,
-                'omapi_port': CONF.network.omapi_port}
-        return utils.render_template(template, opts)
+        with open(template, 'r') as f:
+            return f.read()
 
     def build_conf(self):
         node_cfgs = []

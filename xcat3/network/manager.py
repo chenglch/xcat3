@@ -74,7 +74,7 @@ class NetworkManager(base_manager.BaseServiceManager):
             opts['netbits'] = ip_wappter.get_net_bits(netmask)
             opts['conductor'] = nic_ip
             opts['next_server'] = nic_ip
-            opts['router'] = network.gateway if network.gateway else nic_ip
+            opts['router'] = network.gateway or nic_ip
             opts['domain_name'] = network.domain
             opts['domain_name_servers'] = network.nameservers
             opts['domain_search'] = network.domain

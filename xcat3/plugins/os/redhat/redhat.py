@@ -12,17 +12,9 @@ from xcat3.plugins import utils as plugin_utils
 CONF = cfg.CONF
 
 
-class RedhatInterface(base.OSImageInterface):
+class RedhatInterface(base.BaseOSImage):
     """Interface for hardware control actions."""
     TMPL_DIR = os.path.abspath(os.path.dirname(__file__))
-
-    def validate(self, node):
-        """validate the specific attribute
-
-        :param node: the node to act on.
-        :raises: MissingParameterValue if a required parameter is missing.
-        """
-        pass
 
     def _get_pkg_list(self):
         """Return pkg list form pkg template"""

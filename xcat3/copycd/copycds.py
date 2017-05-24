@@ -3,27 +3,17 @@
 from __future__ import print_function
 
 import os
-import shutil
-
 from oslo_config import cfg
-from oslo_utils import fileutils
 
 from xcat3.common import exception
 from xcat3.common import utils
 from xcat3.copycd import base
+from xcat3.copycd import cache
+from xcat3.common.i18n import _, _LE, _LI, _LW
+from oslo_log import log
+LOG = log.getLogger(__name__)
 
 CONF = cfg.CONF
-
-
-def _backup_iso(iso, install_dir, image):
-    iso_dir = os.path.join(install_dir, 'iso')
-    fileutils.ensure_tree(iso_dir)
-    backup_path = os.path.join(iso_dir, '%s.iso' % image)
-    if not os.path.exists(backup_path):
-        print(_("Copy iso from %(src)s to %(dst)s" % {'src': iso,
-                                                      'dst': backup_path}))
-        shutil.copy(iso, backup_path)
-    return os.path.relpath(iso_dir,install_dir)
 
 
 def create(iso, image=None, install_dir=None, upload=True):
@@ -37,16 +27,19 @@ def create(iso, image=None, install_dir=None, upload=True):
         # tempdir = os.path.join(CONF.tempdir, 'copycds')
         mount_args = ['-t', 'udf,iso9660', '-o', 'ro,loop']
         sub_classes = base.get_subclasses(base.Image)
+        LOG.info(_LI("Mounting iso from %(iso)s to %(path)s "),
+                     {'iso': iso, 'path': mntdir})
         utils.mount(iso, mntdir, *mount_args)
         for image_class in sub_classes:
             image_obj = image_class(mntdir, install_dir, image)
             image_info = image_obj.parse_info()
             if not image_info:
                 continue
+            LOG.info(_LI("Copycd is running for iso %(iso)s"), {'iso': iso})
             image_obj.copycd(image_info)
-            backup_path = _backup_iso(iso, install_dir, image)
+            cache.backup_iso(iso, install_dir, image)
             if upload:
-                image_obj.upload(image_info, backup_path)
+                image_obj.upload(image_info, os.path.basename(iso))
         utils.umount(mntdir)
 
 
