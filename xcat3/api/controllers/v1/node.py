@@ -69,6 +69,8 @@ def _wait_rpc_result(futures, names, result, json=True):
     for r in done:
         nodes = getattr(r, 'nodes', None)
         if r.exception():
+            LOG.exception(_LE('Error in wait_workers %(err)s'),
+                          {'err': six.text_type(r.exception())})
             if nodes:
                 utils.fill_result(result['nodes'], nodes,
                                   r.exception().message)
@@ -524,11 +526,8 @@ class NodesController(rest.RestController):
             for item in dups:
                 result['nodes'][item] = msg
             nodes = filter(lambda x: x.name not in dups, nodes)
-            new_nodes = []
-            for node in nodes:
-                new_node = _create_object(node, result)
-                if new_node is not None:
-                    new_nodes.append(new_node)
+            new_nodes = [_create_object(node, result) for node in nodes if
+                         node is not None]
             if new_nodes:
                 objects.Node.create_nodes(new_nodes)
             return result

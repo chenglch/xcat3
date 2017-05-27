@@ -108,18 +108,11 @@ class ConductorAPI(object):
 
         :param futures: List of future objects.
         :param timout: Max time to wait for the green thread to complete.
-        :returns:
+        :returns: (done, not_done) pair
             done: A list of future objects finished
             not_done: A list of future objects unfinished
-
         """
-        done, not_done = waiters.wait_for_all(futures, timeout)
-        for r in done:
-            if r.exception():
-                LOG.exception(_LE(
-                    'Error in wait_workers %(err)s'),
-                    {'err': six.text_type(r.exception())})
-        return done, not_done
+        return waiters.wait_for_all(futures, timeout)
 
     def get_topic_for(self, nodes):
         """Get the RPC topic for the conductor service the nodes are mapped to.
