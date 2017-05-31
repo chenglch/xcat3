@@ -28,6 +28,7 @@ from xcat3.api.controllers import link
 from xcat3.api.controllers.v1 import node
 from xcat3.api.controllers.v1 import network
 from xcat3.api.controllers.v1 import osimage
+from xcat3.api.controllers.v1 import passwd
 from xcat3.api.controllers.v1 import nic
 from xcat3.api.controllers.v1 import service
 from xcat3.api.controllers.v1 import versions
@@ -96,6 +97,7 @@ class Controller(rest.RestController):
     nodes = node.NodesController()
     networks = network.NetworkController()
     osimages = osimage.OSImageController()
+    passwds = passwd.PasswdController()
     nics = nic.NicController()
     services = service.ServiceController()
 

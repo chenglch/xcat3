@@ -21,60 +21,55 @@ from xcat3.objects import fields as object_fields
 
 
 @base.XCAT3ObjectRegistry.register
-class OSImage(base.XCAT3Object, object_base.VersionedObjectDictCompat):
+class Passwd(base.XCAT3Object, object_base.VersionedObjectDictCompat):
     VERSION = '1'
 
     dbapi = db_api.get_instance()
 
     fields = {
         'id': object_fields.IntegerField(),
-        'name': object_fields.StringField(nullable=False),
-        'ver': object_fields.StringField(nullable=False),
-        'arch': object_fields.StringField(nullable=False),
-        'distro': object_fields.StringField(nullable=False),
-        'profile': object_fields.StringField(nullable=True),
-        'type': object_fields.StringField(nullable=True),
-        'provmethod': object_fields.StringField(nullable=True),
-        'rootfstype': object_fields.StringField(nullable=True),
-        'orig_name': object_fields.StringField(nullable=True),
+        'key': object_fields.StringField(nullable=False),
+        'username': object_fields.StringField(nullable=True),
+        'password': object_fields.StringField(nullable=False),
+        'crypt_method': object_fields.StringField(nullable=True),
     }
 
     @classmethod
-    def get_by_id(cls, context, image_id):
-        """Find a image based on its integer id and return a OSImage object.
+    def get_by_id(cls, context, passwd_id):
+        """Find a passwd based on its integer id and return a Passwd object.
 
-        :param image_id: the id of a image.
-        :returns: a :class:`OSImage` object.
+        :param passwd_id: the id of a passwd.
+        :returns: a :class:`Passwd` object.
         """
-        db_image = cls.dbapi.get_image_by_id(image_id)
-        image = cls._from_db_object(cls(context), db_image)
-        return image
+        db_passwd = cls.dbapi.get_passwd_by_id(passwd_id)
+        passwd = cls._from_db_object(cls(context), db_passwd)
+        return passwd
 
     @classmethod
-    def get_by_name(cls, context, name):
-        """Find a image based on name and return a OSImage object.
+    def get_by_key(cls, context, key):
+        """Find a passwd based on key and return a Passwd object.
 
-        :param name: the name of a image.
-        :returns: a :class:`OSImage` object.
+        :param key: the key name of a passwd.
+        :returns: a :class:`Passwd` object.
         """
-        db_image = cls.dbapi.get_image_by_name(name)
-        image = cls._from_db_object(cls(context), db_image)
-        return image
+        db_passwd = cls.dbapi.get_passwd_by_key(key)
+        passwd = cls._from_db_object(cls(context), db_passwd)
+        return passwd
 
     @classmethod
     def list(cls, context):
-        """Return a list of OSImage objects.
+        """Return a list of Passwd objects.
 
         :param context: Security context.
-        :returns: a list of :class:`OSImage` object.
+        :returns: a list of :class:`Passwd` object.
 
         """
-        db_images = cls.dbapi.get_image_list()
-        images = cls._from_db_object_list(context, db_images)
-        return images
+        db_passwds = cls.dbapi.get_passwd_list()
+        passwds = cls._from_db_object_list(context, db_passwds)
+        return passwds
 
     def create(self, context=None):
-        """Create a image record in the DB.
+        """Create a passwd record in the DB.
 
         Column-wise updates will be made based on the result of
         self.what_changed().
@@ -88,11 +83,11 @@ class OSImage(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         :raises: InvalidParameterValue if some property values are invalid.
         """
         values = self.obj_get_changes()
-        db_image = self.dbapi.create_image(values)
-        self._from_db_object(self, db_image)
+        db_passwd = self.dbapi.create_passwd(values)
+        self._from_db_object(self, db_passwd)
 
     def destroy(self, context=None):
-        """Delete the image from the DB.
+        """Delete the passwd from the DB.
 
         :param context: Security context. NOTE: This should only
                         be used internally by the indirection_api.
@@ -101,11 +96,11 @@ class OSImage(base.XCAT3Object, object_base.VersionedObjectDictCompat):
                         A context should be set when instantiating the
                         object, e.g.: Node(context)
         """
-        self.dbapi.destroy_image(self.name)
+        self.dbapi.destroy_passwd(self.key)
         self.obj_reset_changes()
 
     def save(self, context=None):
-        """Save updates to this image.
+        """Save updates to this passwd object.
 
         Column-wise updates will be made based on the result of
         self.what_changed().
@@ -119,6 +114,6 @@ class OSImage(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         :raises: InvalidParameterValue if some property values are invalid.
         """
         updates = self.obj_get_changes()
-        db_image = self.dbapi.update_image(self.id, updates)
-        self.updated_at = db_image['updated_at']
+        db_passwd = self.dbapi.update_passwd(self.id, updates)
+        self.updated_at = db_passwd['updated_at']
         self.obj_reset_changes()

@@ -678,3 +678,62 @@ class Connection(api.Connection):
                 raise exception.DuplicateName(net=values['name'])
             else:
                 raise
+
+    def get_passwd_by_id(self, id):
+        query = model_query(models.Passwd)
+        query = query.filter_by(id=id)
+        try:
+            return query.one()
+        except NoResultFound:
+            raise exception.PasswdNotFound(key=id)
+
+    def get_passwd_by_key(self, key):
+        query = model_query(models.Passwd)
+        query = query.filter_by(key=key)
+        try:
+            return query.one()
+        except NoResultFound:
+            raise exception.PasswdNotFound(key=key)
+
+    def get_passwd_list(self):
+        query = model_query(models.Passwd)
+        return query.all()
+
+    def create_passwd(self, values):
+        passwd = models.Passwd()
+        passwd.update(values)
+        with _session_for_write() as session:
+            try:
+                session.add(passwd)
+                session.flush()
+            except db_exc.DBDuplicateEntry as exc:
+                raise exception.PasswdAlreadyExists(key=values['key'])
+            return passwd
+
+    def destroy_passwd(self, key):
+        with _session_for_write():
+            query = model_query(models.Passwd)
+            query = query.filter_by(key=key)
+
+            try:
+                passwd = query.one()
+            except NoResultFound:
+                raise exception.PasswdNotFound(key=key)
+            query.delete()
+
+    def update_passwd(self, pwsswd_id, values):
+        try:
+            with _session_for_write():
+                query = model_query(models.Passwd)
+                query = add_identity_filter(query, pwsswd_id)
+                try:
+                    ref = query.with_lockmode('update').one()
+                except NoResultFound:
+                    raise exception.PasswdNotFound(key=pwsswd_id)
+                ref.update(values)
+                return ref
+        except db_exc.DBDuplicateEntry as e:
+            if 'key' in e.columns:
+                raise exception.DuplicateName(net=values['key'])
+            else:
+                raise

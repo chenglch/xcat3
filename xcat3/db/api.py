@@ -300,3 +300,27 @@ class Connection(object):
     @abc.abstractmethod
     def update_image(self, osimage_id, values):
         """Update image"""
+
+    @abc.abstractmethod
+    def get_passwd_by_id(self, id):
+        """Get Passwd"""
+
+    @abc.abstractmethod
+    def get_passwd_by_key(self, key):
+        """Get Passwd"""
+
+    @abc.abstractmethod
+    def get_passwd_list(self):
+        """Get passwd object list"""
+
+    @abc.abstractmethod
+    def create_passwd(self, values):
+        """Create Passwd object"""
+
+    @abc.abstractmethod
+    def destroy_passwd(self, key):
+        """Delete Passwd object"""
+
+    @abc.abstractmethod
+    def update_passwd(self, pwsswd_id, values):
+        """Update attribute for Passwd object"""

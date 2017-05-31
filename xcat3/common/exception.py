@@ -189,6 +189,10 @@ class OSImageNotFound(NotFound):
     _msg_fmt = _("OSImage %(image)s could not be found")
 
 
+class PasswdNotFound(NotFound):
+    _msg_fmt = _("Passwd %(key)s could not be found")
+
+
 class NoValidHost(NotFound):
     _msg_fmt = _("No valid host was found. Reason: %(reason)s")
 
@@ -228,6 +232,10 @@ class NetworkAlreadyExists(Conflict):
 
 class OSImageAlreadyExists(Conflict):
     _msg_fmt = _("A image with name %(name)s already exists.")
+
+
+class PasswdAlreadyExists(Conflict):
+    _msg_fmt = _("A passwd with key %(key)s already exists.")
 
 
 class NotAuthorized(XCAT3Exception):

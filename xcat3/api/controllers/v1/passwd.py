@@ -1,4 +1,5 @@
 # Copyright 2013 Hewlett-Packard Development Company, L.P.
+# Updated 2017 for xcat test purpose
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -37,25 +38,21 @@ CONF = xcat3.conf.CONF
 LOG = log.getLogger(__name__)
 
 
-class OSImage(base.APIBase):
+class Passwd(base.APIBase):
     """API representation of image.
 
     This class enforces type checking and value constraints, and converts
     between the internal object model and the API representation of a image.
     """
-    name = wsme.wsattr(wtypes.text, mandatory=True)
-    """The name of image"""
-    ver = wsme.wsattr(wtypes.text)
-    arch = wsme.wsattr(wtypes.text)
-    distro = wsme.wsattr(wtypes.text)
-    profile = wsme.wsattr(wtypes.text)
-    provmethod = wsme.wsattr(wtypes.text)
-    rootfstype = wsme.wsattr(wtypes.text)
-    orig_name = wsme.wsattr(wtypes.text)
+    key = wsme.wsattr(wtypes.text, mandatory=True)
+    """The key name of passwd"""
+    username = wsme.wsattr(wtypes.text)
+    password = wsme.wsattr(wtypes.text)
+    crypt_method = wsme.wsattr(wtypes.text)
 
     def __init__(self, **kwargs):
         self.fields = []
-        fields = list(objects.OSImage.fields)
+        fields = list(objects.Passwd.fields)
         for k in fields:
             # Add fields we expose.
             if hasattr(self, k):
@@ -63,80 +60,80 @@ class OSImage(base.APIBase):
                 setattr(self, k, kwargs.get(k, wtypes.Unset))
 
     @classmethod
-    def get_api_image(cls, name):
-        return cls(name=name)
+    def get_api_passwd(cls, key):
+        return cls(key=key)
 
     @staticmethod
     def convert_with_links(net, fields=None):
-        image = OSImage(**net.as_dict())
-        return image
+        passwd = Passwd(**net.as_dict())
+        return passwd
 
 
-class OSImagePatchType(types.JsonPatchType):
-    _api_base = OSImage
+class PasswdPatchType(types.JsonPatchType):
+    _api_base = Passwd
 
     @staticmethod
     def internal_attrs():
         defaults = types.JsonPatchType.internal_attrs()
+        defaults.append('key')
         return defaults
 
 
-class OSImageCollection(collection.Collection):
-    """API representation of a collection of osimages."""
+class PasswdCollection(collection.Collection):
+    """API representation of a collection of passwds."""
 
-    images = [OSImage]
+    passwds = [Passwd]
     """A list containing image objects"""
 
     def __init__(self, *args, **kwargs):
-        self._type = 'images'
+        self._type = 'passwds'
 
     @staticmethod
-    def convert_with_links(images, url=None, fields=None,**kwargs):
-        collection = OSImageCollection()
-        collection.images = [OSImage.convert_with_links(n, fields=fields)
-                             for n in images]
+    def convert_with_links(passwds, url=None, fields=None,**kwargs):
+        collection = PasswdCollection()
+        collection.passwds = [Passwd.convert_with_links(n, fields=fields)
+                             for n in passwds]
         collection.next = collection.get_next(None, url=url, **kwargs)
         return collection
 
 
-class OSImageController(rest.RestController):
-    invalid_sort_key_list = ['name']
+class PasswdController(rest.RestController):
+    invalid_sort_key_list = ['key']
 
     _custom_actions = {
         'get_by_id': ['GET']
     }
 
-    def _update_changed_fields(self, image, image_obj):
-        """Update rpc_image based on changed fields in a image.
+    def _update_changed_fields(self, passwd, passwd_obj):
+        """Update rpc_passwd based on changed fields in a passwd.
 
         """
-        for field in objects.OSImage.fields:
+        for field in objects.Passwd.fields:
             try:
-                patch_val = getattr(image, field)
+                patch_val = getattr(passwd, field)
             except AttributeError:
                 continue
             if patch_val == wtypes.Unset:
                 patch_val = None
-            if image_obj[field] != patch_val:
-                image_obj[field] = patch_val
+            if passwd_obj[field] != patch_val:
+                passwd_obj[field] = patch_val
 
-    @expose.expose(OSImage, int, types.listtype)
+    @expose.expose(Passwd, int, types.listtype)
     def get_by_id(self, id, fields=None):
         context = pecan.request.context
-        image_obj = objects.OSImage.get_by_id(context, id)
-        return OSImage.convert_with_links(image_obj, fields=fields)
+        passwd_obj = objects.Passwd.get_by_id(context, id)
+        return Passwd.convert_with_links(passwd_obj, fields=fields)
 
-    @expose.expose(OSImage, types.name, types.listtype)
-    def get_one(self, name, fields=None):
+    @expose.expose(Passwd, types.name, types.listtype)
+    def get_one(self, key, fields=None):
         context = pecan.request.context
-        image_obj = objects.OSImage.get_by_name(context, name)
-        return OSImage.convert_with_links(image_obj, fields=fields)
+        passwd_obj = objects.Passwd.get_by_key(context, key)
+        return Passwd.convert_with_links(passwd_obj, fields=fields)
 
-    @expose.expose(OSImageCollection, int, wtypes.text, wtypes.text,
+    @expose.expose(PasswdCollection, int, wtypes.text, wtypes.text,
                    wtypes.text, types.listtype)
-    def get_all(self, limit=None, sort_key='id', sort_dir='asc',
-                fields=None):
-        """Retrieve a list of images.
+    def get_all(self, limit=None, sort_key='id', sort_dir='asc'):
+        """Retrieve a list of passwds.
 
         :param limit: maximum number of resources to return in a single result.
                       This value cannot be larger than the value of max_limit
@@ -147,51 +144,49 @@ class OSImageController(rest.RestController):
         :param fields: Optional, a list with a specified set of fields
                        of the resource to be returned.
         """
-        if fields is None:
-            fields = ['name']
-        images = objects.OSImage.list(pecan.request.context)
-        return OSImageCollection.convert_with_links(images)
+        passwds = objects.Passwd.list(pecan.request.context)
+        return PasswdCollection.convert_with_links(passwds)
 
-    @expose.expose(types.jsontype, body=OSImage,
+    @expose.expose(types.jsontype, body=Passwd,
                    status_code=http_client.CREATED)
-    def post(self, image):
-        """Create image
+    def post(self, passwd):
+        """Create passwd
 
-        :param image: image with the request
+        :param passwd: passwd with the request
         """
         context = pecan.request.context
-        new_image = objects.OSImage(context, **image.as_dict())
-        new_image.create()
-        result = {'image': dict()}
-        result['image'][image.name] = 'ok'
+        new_passwd = objects.Passwd(context, **passwd.as_dict())
+        new_passwd.create()
+        result = {'passwd': dict()}
+        result['passwd'][passwd.key] = 'ok'
         return types.JsonType.validate(result)
 
     @expose.expose(None, types.name, status_code=http_client.ACCEPTED)
-    def delete(self, name):
-        """Delete image
+    def delete(self, key):
+        """Delete passwd
 
-        :param nodes: image name to delete, api format
+        :param nodes: passwd key to delete, api format
         """
         context = pecan.request.context
-        image_obj = objects.OSImage.get_by_name(context, name)
-        image_obj.destroy()
+        passwd_obj = objects.Passwd.get_by_key(context, key)
+        passwd_obj.destroy()
 
-    @expose.expose(OSImage, types.name, body=[OSImagePatchType])
-    def patch(self, name, patch):
-        """Update an existing image.
+    @expose.expose(Passwd, types.name, body=[PasswdPatchType])
+    def patch(self, key, patch):
+        """Update an existing passwd.
 
-        :param name: The name of image.
-        :param patch: a json PATCH document to apply to this image.
+        :param key: The key of passwd.
+        :param patch: a json PATCH document to apply to this passwd.
         :return: json format api node
         """
         context = pecan.request.context
-        image_obj = objects.OSImage.get_by_name(context, name)
+        passwd_obj = objects.Passwd.get_by_key(context, key)
         try:
-            image_dict = image_obj.as_dict()
-            image = OSImage(**api_utils.apply_jsonpatch(image_dict, patch))
+            passwd_dict = passwd_obj.as_dict()
+            passwd = Passwd(**api_utils.apply_jsonpatch(passwd_dict, patch))
         except api_utils.JSONPATCH_EXCEPTIONS as e:
             raise exception.PatchError(patch=patch, reason=e)
-        self._update_changed_fields(image, image_obj)
-        image_obj.save()
-        api_image = OSImage.convert_with_links(image_obj)
-        return api_image
+        self._update_changed_fields(passwd, passwd_obj)
+        passwd_obj.save()
+        api_passwd = Passwd.convert_with_links(passwd_obj)
+        return api_passwd

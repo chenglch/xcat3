@@ -94,7 +94,7 @@ class NicPatchType(types.JsonPatchType):
 
 
 class NicCollection(collection.Collection):
-    """API representation of a collection of ports."""
+    """API representation of a collection of nics."""
 
     nics = [Nic]
     """A list containing nics objects"""

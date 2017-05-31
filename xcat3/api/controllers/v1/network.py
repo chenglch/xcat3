@@ -43,7 +43,7 @@ class Network(base.APIBase):
     This class enforces type checking and value constraints, and converts
     between the internal object model and the API representation of a network.
     """
-    name = wsme.wsattr(wtypes.text)
+    name = wsme.wsattr(wtypes.text, mandatory=True)
     """The name of network"""
     subnet = wsme.wsattr(types.iptype)
     netmask = wsme.wsattr(types.iptype)
@@ -173,10 +173,6 @@ class NetworkController(rest.RestController):
         :param network: network with the request
         """
         context = pecan.request.context
-        if not hasattr(network, 'name'):
-            raise exception.InvalidParameterValue(
-                _("Invalid request parameter %(network)s") % {
-                    'network': str(network)})
         new_network = objects.Network(context, **network.as_dict())
         new_network.create()
         pecan.request.network_api.broadcast(context)
