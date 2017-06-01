@@ -27,6 +27,7 @@ import oslo_messaging as messaging
 from futurist import waiters
 
 from xcat3.common import exception
+from xcat3.common import password_utils
 from xcat3.common import utils
 from xcat3.conductor import base_manager
 from xcat3.conductor import task_manager
@@ -199,20 +200,24 @@ class ConductorManager(base_manager.BaseConductorManager):
     @messaging.expected_exceptions(exception.InvalidParameterValue,
                                    exception.NoFreeServiceWorker,
                                    exception.NodeLocked)
-    def provision(self, context, names, target, osimage=None, subnet=None):
+    def provision(self, context, names, target, osimage, passwd, subnet):
         """RPC method to provision node into target state
 
         :param context: an admin context.
         :param names: the names of nodes.
         :param target: the desired state of nodes.
-        :param osimage: the rpc object of osimage
-        :param subnet: the rpc network object for deploying
+        :param osimage: the rpc object of osimage, if none, check osimage_id
+                        defined as node attribute.
+        :param passwd: the passwd object used to setup password for deployed
+                       machine.
+        :param subnet: the rpc network object for deploying.
         :raises: NoFreeServiceWorker when there is no free worker to start
                  async task.
         :raises: InvalidParameterValue
         :raises: MissingParameterValue
 
         """
+
         def _validate_node_image(result, nodes, image_set):
             osimages = objects.OSImage.list(context)
             # assume there are not too many osimage records
@@ -243,7 +248,7 @@ class ConductorManager(base_manager.BaseConductorManager):
                     cd_cache.ensure_osimage(url, CONF.deploy.install_dir,
                                             img.orig_name)
 
-        def _provision(node, target, osimage, dhcp_opts, subnet=None):
+        def _provision(node, target, osimage, dhcp_opts, passwd, subnet):
             """provision step for each node
 
             This subroutie is running in greenthread. Every node has its
@@ -269,9 +274,15 @@ class ConductorManager(base_manager.BaseConductorManager):
             node.osimage_id = osimage.id
             os_plugin = self.plugins.get_osimage_plugin(osimage)
             os_boot_str = os_plugin.build_os_boot_str(node, osimage)
-            os_plugin.build_template(node, osimage)
+            # if password is encrypted, all of the nodes are deployed with the
+            # same hashed password, if unhashed password is given, the hashed
+            # password are generated with different salt.
+            password = password_utils.crypt_passwd(passwd.password,
+                                                   passwd.crypt_method)
+            os_plugin.build_template(node, osimage, password)
             boot_plugin.build_boot_conf(node, os_boot_str, osimage)
 
+        # main function for provision
         LOG.info(_LI("RPC provision called for nodes %(nodes)s. "
                      "The desired new state is %(target)s."),
                  {'nodes': str(names), 'target': target})
@@ -294,6 +305,7 @@ class ConductorManager(base_manager.BaseConductorManager):
                                                 target=target,
                                                 osimage=osimage,
                                                 dhcp_opts=dhcp_opts,
+                                                passwd=passwd,
                                                 subnet=subnet)
             if os_filter_result:
                 result.update(os_filter_result)
@@ -321,6 +333,7 @@ class ConductorManager(base_manager.BaseConductorManager):
         :raises: InvalidParameterValue
         :raises: MissingParameterValue
         """
+
         def _clean(node):
             boot_plugin = self.plugins.get_boot_plugin(node)
             boot_plugin.clean(node)
@@ -341,7 +354,6 @@ class ConductorManager(base_manager.BaseConductorManager):
                 result = dict()
                 utils.fill_result(result, names, e.message)
             return result
-
 
     @messaging.expected_exceptions(exception.InvalidParameterValue,
                                    exception.NoFreeServiceWorker,

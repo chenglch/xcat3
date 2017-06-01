@@ -301,7 +301,7 @@ class ConductorAPI(object):
 
         return self.spawn_rpc_worker(_destroy_nodes, names=names)
 
-    def provision(self, context, names, target, osimage, subnet=None):
+    def provision(self, context, names, target, osimage, passwd, subnet):
         """Change nodes's provision state.
 
         Synchronously, acquire lock and start the conductor background task
@@ -314,12 +314,14 @@ class ConductorAPI(object):
                  async task.
         """
 
-        def _provision(cctxt, names, target, osimage, subnet=None):
+        def _provision(cctxt, names, target, osimage, passwd, subnet):
             return cctxt.call(context, 'provision', names=names,
-                              target=target, osimage=osimage, subnet=subnet)
+                              target=target, osimage=osimage, passwd=passwd,
+                              subnet=subnet)
 
         return self.spawn_rpc_worker(_provision, names=names, target=target,
-                                     osimage=osimage, subnet=subnet)
+                                     osimage=osimage, passwd=passwd,
+                                     subnet=subnet)
 
     def clean(self, context, result, names):
         """Clean up the files and configuration while depoying.

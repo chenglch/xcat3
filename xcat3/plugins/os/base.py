@@ -46,11 +46,12 @@ class OSImageInterface(base.BaseInterface):
         pass
 
     @abc.abstractmethod
-    def build_template(self, node, osimage):
+    def build_template(self, node, osimage, password):
         """Render kickstart template file
 
         :param node: the node to act on.
         :param osimage: osimage object.
+        :param password: password for root user
         :raises: MissingParameterValue if a required parameter is missing.
         """
 
@@ -96,11 +97,12 @@ class BaseOSImage(OSImageInterface):
         """Return pkg list form pkg template"""
         pass
 
-    def build_template(self, node, osimage):
+    def build_template(self, node, osimage, password):
         """Render kickstart template file
 
         :param node: the node to act on.
         :param osimage: osimage object.
+        :param password: password for root user.
         :raises: MissingParameterValue if a required parameter is missing.
         """
         opts = {'host_ip': CONF.conductor.host_ip,
@@ -109,7 +111,7 @@ class BaseOSImage(OSImageInterface):
                 'timezone': 'US/Eastern', 'pkg_list': self._get_pkg_list(),
                 'mirror': '%s%s/%s' % (osimage.distro, osimage.ver,
                                        osimage.arch),
-                'password': '$6$aUIiJMOg$E4I3hIWzq4eFeIx5zZVtWD.cnDrZs2vJycn4UWPhMcj4JpJPv5wSFEA2HTrVLD5femgQ.kWKQHgzhlKBPDDLH/',
+                'password': password,
                 'api_ip': CONF.api.host_ip,
                 'api_port': CONF.api.port,
                 'node': node.name,

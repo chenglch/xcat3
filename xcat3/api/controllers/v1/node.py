@@ -48,6 +48,10 @@ _DEFAULT_RETURN_FIELDS = ('name', 'reservation', 'created_at', 'nics_info',
                           'updated_at', 'id')
 _UNSET_NODE_FIELDS = ('id', 'created_at', 'updated_at')
 _REST_RESOURCE = ('power', 'provision', 'boot_device')
+# for passwd
+SYSTEM_KEY = 'system'
+DEFAULT_PASSWORD = 'cluster'
+
 
 ALLOWED_TARGET_POWER_STATES = (xcat3_states.POWER_ON,
                                xcat3_states.POWER_OFF)
@@ -216,7 +220,6 @@ class NodeCollection(collection.Collection):
 
 
 class NodeProvisionController(rest.RestController):
-
     _custom_actions = {
         'callback': ['PUT']
     }
@@ -248,16 +251,24 @@ class NodeProvisionController(rest.RestController):
         if not names:
             return result
         context = pecan.request.context
-        # Get the rpc object which can transfer via rpc calls
-        if subnet:
-            subnet = objects.Network.get_by_name(context, subnet)
-        if osimage:
-            osimage = objects.OSImage.get_by_name(context, osimage)
 
         if not target.startswith('un_'):
+            # Get the rpc object which can transfer via rpc calls
+            if subnet:
+                subnet = objects.Network.get_by_name(context, subnet)
+            if osimage:
+                osimage = objects.OSImage.get_by_name(context, osimage)
+            try:
+                passwd = objects.Passwd.get_by_key(context, SYSTEM_KEY)
+            except exception.PasswdNotFound:
+                dct = {'key': SYSTEM_KEY, 'password': DEFAULT_PASSWORD,
+                       'crypt_method': None}
+                passwd = objects.Passwd(context, **dct)
+
             futures = pecan.request.rpcapi.provision(context, names,
                                                      target=target,
                                                      osimage=osimage,
+                                                     passwd=passwd,
                                                      subnet=subnet)
         else:
             futures = pecan.request.rpcapi.clean(context, result, names)
@@ -276,10 +287,9 @@ class NodeProvisionController(rest.RestController):
 
         return types.JsonType.validate(result)
 
-
     @expose.expose(types.jsontype, wtypes.text, body=types.jsontype)
     def callback(self, name, action=None):
-        msg = "Callback request reveived name=%(name)s" % {'name':name}
+        msg = "Callback request reveived name=%(name)s" % {'name': name}
         if action is not None:
             msg += ' action=%s' % str(action)
         LOG.info(_LI(msg))
