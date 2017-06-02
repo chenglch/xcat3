@@ -1,6 +1,8 @@
 import abc
+import jinja2
 import os
 import platform
+import weakref
 import subprocess
 import six
 
@@ -57,6 +59,7 @@ class ISCDHCPService(DhcpBase):
     DHCP_DICT = {'66': 'server.server-name', '67': 'server.filename',
                  '12': 'host-name', '15': 'server.ddns-hostname'}
     dbapi = db_api.get_instance()
+    tmpl = None
 
     def __init__(self):
         super(ISCDHCPService, self).__init__()
@@ -183,7 +186,14 @@ class ISCDHCPService(DhcpBase):
         """Store the configuration options node_opts as dict"""
         node_opts = {}
         if op == 'add':
-            template = os.path.join(BASEDIR, 'dhcp_node.template')
+            if cls.tmpl is None or cls.tmpl() is None:
+                template = os.path.join(BASEDIR, 'dhcp_node.template')
+                tmpl_path, tmpl_name = os.path.split(template)
+                loader = jinja2.FileSystemLoader(tmpl_path)
+                env = jinja2.Environment(loader=loader)
+                cls.tmpl = weakref.ref(env.get_template(tmpl_name))
+            tmpl = cls.tmpl()
+
             for name in names:
                 opts = dhcp_opts[name]
                 config = {}
@@ -191,7 +201,10 @@ class ISCDHCPService(DhcpBase):
                 config['mac'] = opts.pop('mac')
                 config['hostname'] = opts.pop('hostname')
                 config['statements'] = cls._build_supersede(opts)
-                config['content'] = utils.render_template(template, config)
+                # for the performance consideration
+                # `utils.render_template(template, config)` is not used
+                # directly
+                config['content'] = tmpl.render(config)
                 node_opts[name] = config
             cls.dbapi.save_or_update_dhcp(names, node_opts)
         elif op == 'remove':

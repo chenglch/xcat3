@@ -10,7 +10,6 @@ from oslo_config import cfg
 
 from xcat3.common import utils
 from xcat3.plugins import base
-from xcat3.plugins import utils as plugin_utils
 from oslo_utils import fileutils
 from oslo_concurrency import lockutils
 
