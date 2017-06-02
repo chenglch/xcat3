@@ -89,10 +89,10 @@ class PasswdCollection(collection.Collection):
         self._type = 'passwds'
 
     @staticmethod
-    def convert_with_links(passwds, url=None, fields=None,**kwargs):
+    def convert_with_links(passwds, url=None, fields=None, **kwargs):
         collection = PasswdCollection()
         collection.passwds = [Passwd.convert_with_links(n, fields=fields)
-                             for n in passwds]
+                              for n in passwds]
         collection.next = collection.get_next(None, url=url, **kwargs)
         return collection
 

@@ -15,6 +15,8 @@
 
 from oslo_versionedobjects import base as object_base
 
+from xcat3.common import exception
+from xcat3.common import password_utils
 from xcat3.db import api as db_api
 from xcat3.objects import base
 from xcat3.objects import fields as object_fields
@@ -33,6 +35,17 @@ class Passwd(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         'password': object_fields.StringField(nullable=False),
         'crypt_method': object_fields.StringField(nullable=True),
     }
+
+    def validate(self, values):
+        if values.get('crypt_method') is not None:
+            method = values['crypt_method']
+            if not method in password_utils.CRYPT_METHODS:
+                msg = _(
+                    "Unknown crypt method %(method)s, Only %(support)s"
+                    " is supported." % {'method': str(method),
+                                        'support': ' '.join(
+                                            password_utils.CRYPT_METHODS)})
+                raise exception.InvalidPasswd(err=msg)
 
     @classmethod
     def get_by_id(cls, context, passwd_id):
@@ -83,6 +96,7 @@ class Passwd(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         :raises: InvalidParameterValue if some property values are invalid.
         """
         values = self.obj_get_changes()
+        self.validate(values)
         db_passwd = self.dbapi.create_passwd(values)
         self._from_db_object(self, db_passwd)
 
@@ -114,6 +128,7 @@ class Passwd(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         :raises: InvalidParameterValue if some property values are invalid.
         """
         updates = self.obj_get_changes()
+        self.validate(updates)
         db_passwd = self.dbapi.update_passwd(self.id, updates)
         self.updated_at = db_passwd['updated_at']
         self.obj_reset_changes()

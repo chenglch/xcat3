@@ -6,14 +6,15 @@ import string
 MD5_PREFIX = '$1$'
 SHA256_PREFIX = '$5$'
 SHA512_PREFIX = '$6$'
-CRYPT_METHODS = (MD5_PREFIX, SHA256_PREFIX, SHA512_PREFIX)
+CRYPT_METHOD_PREFIX = (MD5_PREFIX, SHA256_PREFIX, SHA512_PREFIX)
 CRYPT_DICT = {'md5': MD5_PREFIX, 'sha256': SHA256_PREFIX,
               'sha512': SHA512_PREFIX}
+CRYPT_METHODS = ('md5', 'sha256', 'sha512')
 
 
 def crypt_passwd(password, method=None, salt=None):
     # already encrypted
-    if password[0:3] in CRYPT_METHODS:
+    if password[0:3] in CRYPT_METHOD_PREFIX:
         return password
 
     if salt is None:

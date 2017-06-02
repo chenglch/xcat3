@@ -46,6 +46,7 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         'console_info': object_fields.FlexibleDictField(nullable=True),
         'conductor_affinity': object_fields.IntegerField(nullable=True),
         'osimage_id': object_fields.IntegerField(nullable=True),
+        # NOTE: passwd_id is not used currently
         'passwd_id': object_fields.IntegerField(nullable=True),
     }
 

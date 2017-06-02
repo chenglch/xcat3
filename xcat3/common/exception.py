@@ -348,3 +348,6 @@ class ThreadConflict(Conflict):
 class TimeoutException(XCAT3Exception):
     _msg_fmt = _("Time out occurs after running func %(func) for %(time)d "
                  "seconds")
+
+class InvalidPasswd(Invalid):
+    _msg_fmt = _("%(err)s.")
