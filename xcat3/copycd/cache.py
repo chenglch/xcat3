@@ -1,3 +1,4 @@
+import eventlet
 import os
 import requests
 import sendfile
@@ -10,11 +11,19 @@ from xcat3.common.i18n import _, _LE, _LI, _LW
 
 LOG = log.getLogger(__name__)
 
+
 def copy_image(src, dst):
     with open(src, 'r') as s:
         filesize = os.path.getsize(s.name)
+        offset = 0
+        block_size = 67108864  # 64M
         with open(dst, 'w') as d:
-            sendfile.sendfile(d.fileno(), s.fileno(), 0, filesize)
+            while offset + block_size < filesize:
+                sendfile.sendfile(d.fileno(), s.fileno(), offset, block_size)
+                # sendfile may block greenthread, yield
+                eventlet.greenthread.sleep(0)
+                offset += block_size
+            sendfile.sendfile(d.fileno(), s.fileno(), offset, filesize)
 
 
 def backup_iso(iso, install_dir, image):
