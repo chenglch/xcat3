@@ -1,9 +1,11 @@
 # coding=utf-8
 
 import abc
+import jinja2
 import os
 import six
 import shutil
+import weakref
 from oslo_config import cfg
 
 from xcat3.common import utils
@@ -84,6 +86,8 @@ class BaseOSImage(OSImageInterface):
 
     def __init__(self):
         self._ensure()
+        self.packages = self._get_pkg_list()
+        self.tmpl = None
 
     def validate(self, node):
         """validate the specific attribute
@@ -105,10 +109,18 @@ class BaseOSImage(OSImageInterface):
         :param password: password for root user.
         :raises: MissingParameterValue if a required parameter is missing.
         """
+        if self.tmpl is None or self.tmpl() is None:
+            template = os.path.join(self.TMPL_DIR, 'compute.tmpl')
+            tmpl_path, tmpl_name = os.path.split(template)
+            loader = jinja2.FileSystemLoader(tmpl_path)
+            env = jinja2.Environment(loader=loader)
+            self.tmpl = weakref.ref(env.get_template(tmpl_name))
+
+        tmpl = self.tmpl()
         opts = {'host_ip': CONF.conductor.host_ip,
                 'mac': node.mac,
                 'install_dir': '/install',
-                'timezone': 'US/Eastern', 'pkg_list': self._get_pkg_list(),
+                'timezone': 'US/Eastern', 'pkg_list': self.packages,
                 'mirror': '%s%s/%s' % (osimage.distro, osimage.ver,
                                        osimage.arch),
                 'password': password,
@@ -116,8 +128,7 @@ class BaseOSImage(OSImageInterface):
                 'api_port': CONF.api.port,
                 'node': node.name,
                 }
-        template = os.path.join(self.TMPL_DIR, 'compute.tmpl')
-        cfg = utils.render_template(template, opts)
+        cfg = tmpl.render(opts)
         node_tmpl = os.path.join(AUTOINST_DIR, node.name)
         utils.write_to_file(node_tmpl, cfg)
 
