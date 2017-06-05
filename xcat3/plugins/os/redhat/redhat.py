@@ -1,13 +1,10 @@
 # coding=utf-8
 
-import abc
 import os
-import six
+import shutil
 from oslo_config import cfg
-
-from xcat3.common import utils
+from oslo_concurrency import lockutils
 from xcat3.plugins.os import base
-from xcat3.plugins import utils as plugin_utils
 
 CONF = cfg.CONF
 
@@ -15,6 +12,11 @@ CONF = cfg.CONF
 class RedhatInterface(base.BaseOSImage):
     """Interface for hardware control actions."""
     TMPL_DIR = os.path.abspath(os.path.dirname(__file__))
+
+    @lockutils.synchronized('xcat3-scripts.lock', external=True)
+    def _ensure(self):
+        shutil.copy(os.path.join(base.SCRIPTS_DIR, 'pre.rhels.sh'),
+                    base.INST_SCRIPTS_DIR)
 
     def _get_pkg_list(self):
         """Return pkg list form pkg template"""

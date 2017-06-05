@@ -180,7 +180,6 @@ class ConductorManager(base_manager.BaseConductorManager):
         """
         LOG.info("RPC destroy_nodes called for nodes %(nodes)s. ",
                  {'nodes': str(names)})
-        result = dict()
         with task_manager.acquire(context, names,
                                   purpose='nodes deletion') as task:
             nodes = task.nodes
@@ -192,9 +191,7 @@ class ConductorManager(base_manager.BaseConductorManager):
             objects.Node.destroy_nodes(nodes)
             LOG.info(_LI('Successfully deleted nodes %(nodes)s.'),
                      {'nodes': names})
-
-            for node in nodes:
-                result[node.name] = xcat3_states.DELETED
+            result = dict((node.name, xcat3_states.DELETED) for node in nodes)
             return result
 
     @messaging.expected_exceptions(exception.InvalidParameterValue,

@@ -543,8 +543,7 @@ class NodesController(rest.RestController):
                 objects.Node.create_nodes(new_nodes)
             return result
 
-        result = dict()
-        result['nodes'] = dict()
+        result = {'nodes': {}}
         nodes = nodes.nodes
         # 15 can be any number else
         if len(nodes) < 15:
