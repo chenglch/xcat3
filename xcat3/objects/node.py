@@ -21,8 +21,6 @@ from xcat3.objects import base
 from xcat3.objects import fields as object_fields
 from xcat3.objects import nic as nic_object
 
-_UNSET_NICS_FIELDS = ('updated_at', 'created_at', 'id', 'node_id')
-
 
 @base.XCAT3ObjectRegistry.register
 class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
@@ -49,18 +47,6 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         # NOTE: passwd_id is not used currently
         'passwd_id': object_fields.IntegerField(nullable=True),
     }
-
-    @classmethod
-    def _get_nics_info(cls, context, node_id):
-        nics = nic_object.Nic.list_by_node_id(context, node_id)
-        nics_info = dict()
-        nics_info['nics'] = []
-        for nic in nics:
-            for field in _UNSET_NICS_FIELDS:
-                delattr(nic, field)
-            nic = nic.as_dict()
-            nics_info['nics'].append(nic)
-        return nics_info
 
     @classmethod
     def get(cls, context, node_id):
@@ -94,7 +80,7 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         """
         db_node = cls.dbapi.get_node_by_name(name)
         node = cls._from_db_object(cls(context), db_node)
-        nics_info = cls._get_nics_info(context, node.id)
+        nics_info = nic_object.Nic.get_nics_info_from_node(node.id)
         setattr(node, 'nics_info', nics_info)
         return node
 
@@ -121,7 +107,7 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
             return nodes
 
         for node in nodes:
-            nics_info = cls._get_nics_info(context, node.id)
+            nics_info = nic_object.Nic.get_nics_info_from_node(node.id)
             setattr(node, 'nics_info', nics_info)
         return nodes
 
@@ -135,41 +121,16 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         nodes = cls._from_db_object_list(context, db_nodes)
 
         if obj_info and 'nics' in obj_info:
-            node_ids = [db_node.id for db_node in db_nodes]
-            db_nics = cls.dbapi.get_nics_in_node_ids(node_ids)
-            nics = nic_object.Nic._from_db_object_list(context, db_nics)
-
-            node_map = dict((node.id, []) for node in nodes)
-            for nic in nics:
-                node_id = nic.node_id
-                for field in _UNSET_NICS_FIELDS:
-                    delattr(nic, field)
-                node_map[node_id].append(nic.as_dict())
-
-            for node in nodes:
-                nics_info = {'nics': node_map[node.id]}
-                setattr(node, 'nics_info', nics_info)
-
+            nic_object.Nic.to_node_objs_with_nics_info(nodes)
         return nodes
 
     @classmethod
     def reserve_nodes(cls, context, tag, node_names, obj_info=None):
         db_nodes = cls.dbapi.reserve_nodes(tag, node_names)
-
         nodes = cls._from_db_object_list(context, db_nodes)
 
         if obj_info and 'nics' in obj_info:
-            node_ids = [db_node.id for db_node in db_nodes]
-            db_nics = cls.dbapi.get_nics_in_node_ids(node_ids)
-            nics = nic_object.Nic._from_db_object_list(context, db_nics)
-
-            node_map = dict((node.id, []) for node in nodes)
-            for nic in nics:
-                node_map[nic.node_id].append(nic.as_dict())
-
-            for node in nodes:
-                nics_info = {'nics': node_map[node.id]}
-                setattr(node, 'nics_info', nics_info)
+            nic_object.Nic.to_node_objs_with_nics_info(nodes)
         return nodes
 
     @classmethod

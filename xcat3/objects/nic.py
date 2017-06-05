@@ -28,6 +28,7 @@ from xcat3.objects import fields as object_fields
 class Nic(base.XCAT3Object, object_base.VersionedObjectDictCompat):
     # Version 1.0: Initial version
     VERSION = '1.0'
+    UNSET_FIELDS_WITH_NODE = ('updated_at', 'created_at', 'id', 'node_id')
 
     dbapi = dbapi.get_instance()
 
@@ -219,3 +220,41 @@ class Nic(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         """
         current = self.get_by_uuid(self._context, uuid=self.uuid)
         self.obj_refresh(current)
+
+    @classmethod
+    def to_node_objs_with_nics_info(cls, node_objs):
+        """Append nics information for node ojects
+
+        :param node_objs: the rpc objects for nodes.
+        :returns: the node object list with nics_info.
+
+        """
+        node_ids = [node.id for node in node_objs]
+        db_nics = cls.dbapi.get_nics_in_node_ids(node_ids)
+        node_dict = dict((node.id, []) for node in node_objs)
+        fields = list(set(cls.fields.keys()) - set(cls.UNSET_FIELDS_WITH_NODE))
+        for nic in db_nics:
+            node_id = nic['node_id']
+            nic_dict = dict((f, nic.get(f)) for f in fields)
+            node_dict[node_id].append(nic_dict)
+
+        for node in node_objs:
+            nics_info = {'nics': node_dict[node.id]}
+            setattr(node, 'nics_info', nics_info)
+        return node_objs
+
+    @classmethod
+    def get_nics_info_from_node(cls, node_id):
+        """Get nics_info dict from node_id
+
+        :param node_id: the id of node
+        :returns: nics_info, a dict structure owned by the given node.
+
+        """
+        db_nics = cls.dbapi.get_nics_by_node_id(node_id)
+        nics_info = {'nics': []}
+        fields = list(set(cls.fields.keys()) - set(cls.UNSET_FIELDS_WITH_NODE))
+        for nic in db_nics:
+            nic_dict = dict((f, nic.get(f)) for f in fields)
+            nics_info['nics'].append(nic_dict)
+        return nics_info
