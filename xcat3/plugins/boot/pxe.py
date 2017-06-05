@@ -68,7 +68,6 @@ class PXEBoot(base.BootInterface):
         """
         node_path = self._get_node_path(node)
         osimage_path = self._get_osimage_path(osimage)
-        self.clean(node)
         fileutils.ensure_tree(node_path)
         kernel = os.path.join(osimage_path, 'vmlinuz')
         if not os.path.exists(kernel) or not os.access(kernel, os.R_OK):
