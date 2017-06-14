@@ -18,7 +18,7 @@ def get_primary_mac_address(node):
     :returns: mac address in the format xx:xx:xx:xx:xx:xx.
     """
     for p in node.nics_info['nics']:
-        if p.get('extra') and p.get('extra').get('primary') and p.get('mac'):
+        if p.has_key('primary'):
             return p['mac']
     return None
 
@@ -30,6 +30,6 @@ def get_primary_ip_address(node):
     :returns: ip address
     """
     for p in node.nics_info['nics']:
-        if p.get('extra') and p.get('extra').get('primary') and p.get('ip'):
+        if p.has_key('primary') and p.has_key('ip'):
             return p['ip']
     return None

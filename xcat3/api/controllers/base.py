@@ -19,7 +19,10 @@ from webob import exc
 import wsme
 from wsme import types as wtypes
 
+from xcat3.db import api as db_api
 from xcat3.common.i18n import _
+
+dbapi = db_api.get_instance()
 
 
 class APIBase(wtypes.Base):

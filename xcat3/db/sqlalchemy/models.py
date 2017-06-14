@@ -95,6 +95,7 @@ class Node(Base):
     scripts_names = Column(String(255), nullable=True)
     control_info = Column(db_types.JsonEncodedDict, nullable=True)
     console_info = Column(db_types.JsonEncodedDict, nullable=True)
+    nics_config = Column(db_types.JsonEncodedDict, nullable=True)
     reservation = Column(String(255), nullable=True)
     conductor_affinity = Column(Integer,
                                 ForeignKey('services.id',
@@ -123,8 +124,8 @@ class Nics(Base):
     netmask = Column(String(36), nullable=True)
     node_id = Column(Integer, ForeignKey('nodes.id'), nullable=True,
                      index=True)
+    primary = Column(Boolean, default=False)
     extra = Column(db_types.JsonEncodedDict, nullable=True)
-    type = Column(String(36), nullable=True)
 
 
 class Networks(Base):

@@ -39,6 +39,7 @@ class Nic(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         'node_id': object_fields.IntegerField(nullable=True),
         'mac': object_fields.MACAddressField(nullable=False),
         'ip': object_fields.StringField(nullable=True),
+        'primary': object_fields.BooleanField(nullable=True),
         'extra': object_fields.FlexibleDictField(nullable=True),
     }
 
@@ -90,10 +91,6 @@ class Nic(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         nic = cls._from_db_object(cls(context), db_nic)
         return nic
 
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable_classmethod
     @classmethod
     def get_by_mac(cls, context, mac):
         """Find a nic based on address and return a :class:`Nic` object.
@@ -108,28 +105,6 @@ class Nic(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         nic = cls._from_db_object(cls(context), db_nic)
         return nic
 
-    @classmethod
-    def list(cls, context, limit=None, sort_key=None, sort_dir=None):
-        """Return a list of Nic objects.
-
-        :param context: Security context.
-        :param limit: maximum number of resources to return in a single result.
-        :param marker: pagination marker for large data sets.
-        :param sort_key: column to sort results by.
-        :param sort_dir: direction to sort. "asc" or "desc".
-        :returns: a list of :class:`Nic` object.
-        :raises: InvalidParameterValue
-
-        """
-        db_nics = cls.dbapi.get_nic_list(limit=limit,
-                                         sort_key=sort_key,
-                                         sort_dir=sort_dir)
-        return cls._from_db_object_list(context, db_nics)
-
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable_classmethod
     @classmethod
     def list_by_node_id(cls, context, node_id, limit=None, sort_key=None,
                         sort_dir=None):

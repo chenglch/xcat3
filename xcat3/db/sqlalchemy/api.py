@@ -132,8 +132,6 @@ class Connection(api.Connection):
         if nics_info:
             for nic in nics_info['nics']:
                 nic_model = models.Nics()
-                if nic.get('primary') is not None:
-                    nic['extra'] = {'primary': True}
                 nic['uuid'] = uuidutils.generate_uuid()
                 nic_model.update(nic)
                 node_model.nics.append(nic_model)
@@ -156,8 +154,6 @@ class Connection(api.Connection):
             if nics_info:
                 for nic in nics_info['nics']:
                     nic_model = models.Nics()
-                    if nic.get('primary') is not None:
-                        nic['extra'] = {'primary': True}
                     nic['uuid'] = uuidutils.generate_uuid()
                     nic_model.update(nic)
                     node_model.nics.append(nic_model)
@@ -350,8 +346,6 @@ class Connection(api.Connection):
                     nics = models.Nics()
                     nic['node_id'] = node.id
                     nic['uuid'] = uuidutils.generate_uuid()
-                    if nic.get('primary') is not None:
-                        nic['extra'] = {'primary': True}
                     nics.update(nic)
                     session.add(nics)
                     session.flush()
@@ -408,8 +402,10 @@ class Connection(api.Connection):
         except NoResultFound:
             raise exception.NicNotFound(nic=mac)
 
-    def get_nic_list(self, limit=None, sort_key=None, sort_dir=None):
-        return _paginate_query(models.Nics, limit, sort_key, sort_dir)
+    def get_nic_list(self):
+        query = model_query(models.Nics)
+        query = query.with_entities(models.Nics.uuid,models.Nics.mac)
+        return query.all()
 
     def get_nics_by_node_id(self, node_id, limit=None, sort_key=None,
                             sort_dir=None):

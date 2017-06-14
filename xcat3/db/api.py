@@ -200,7 +200,7 @@ class Connection(object):
         """Get nic from mac"""
 
     @abc.abstractmethod
-    def get_nic_list(self, limit=None, sort_key=None, sort_dir=None):
+    def get_nic_list(self):
         """List all the nics"""
 
     @abc.abstractmethod

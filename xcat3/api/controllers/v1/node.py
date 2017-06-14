@@ -19,11 +19,10 @@ import pecan
 from oslo_log import log
 from pecan import rest
 from xcat3.api import expose
-from xcat3.db import api as db_api
+
 import xcat3.conf
 import six
 from six.moves import http_client
-import retrying
 import traceback
 from xcat3.common import exception
 from xcat3.common import utils
@@ -56,7 +55,7 @@ DEFAULT_PASSWORD = 'cluster'
 ALLOWED_TARGET_POWER_STATES = (xcat3_states.POWER_ON,
                                xcat3_states.POWER_OFF)
 
-dbapi = db_api.get_instance()
+dbapi = base.dbapi
 
 
 def _wait_rpc_result(futures, names, result, json=True):

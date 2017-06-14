@@ -13,7 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import datetime
 import pecan
 from pecan import rest
 from six.moves import http_client
@@ -31,6 +30,7 @@ from xcat3.common import states
 from xcat3 import objects
 
 _DEFAULT_RETURN_FIELDS = ('uuid', 'mac')
+dbapi = base.dbapi
 
 
 class Nic(base.APIBase):
@@ -52,6 +52,7 @@ class Nic(base.APIBase):
     """This nics's meta data"""
     # NOTE(chenglch): For post purpose, to accept node name
     node = wsme.wsattr(wtypes.text)
+    primary = types.boolean
     node_id = wsme.wsattr(int)
 
     def __init__(self, **kwargs):
@@ -119,24 +120,6 @@ class NicController(rest.RestController):
         'address': ['GET'],
     }
 
-    def _get_nics_collection(self, limit=1000, sort_key='id',
-                             sort_dir='asc', fields=None):
-        # NOTE(chenglch): For list query, do not show the node inforamtion
-        # about current nic.
-        if not fields:
-            fields = ['mac', 'uuid']
-        if sort_key in self.invalid_sort_key_list:
-            raise exception.InvalidParameterValue(
-                _("The sort_key value %(key)s is an invalid field for "
-                  "sorting") % {'key': sort_key})
-        nics = objects.Nic.list(pecan.request.context, limit,
-                                sort_key=sort_key, sort_dir=sort_dir)
-
-        parameters = {'sort_key': sort_key, 'sort_dir': sort_dir}
-        return NicCollection.convert_with_links(nics, limit,
-                                                fields=fields,
-                                                **parameters)
-
     def _update_changed_fields(self, nic, nic_obj):
         """Update rpc_nic based on changed fields in a nic.
 
@@ -173,25 +156,13 @@ class NicController(rest.RestController):
         nic_obj = objects.Nic.get_by_uuid(context, uuid)
         return Nic.convert_with_links(nic_obj, fields=fields)
 
-    @expose.expose(NicCollection, int, wtypes.text, wtypes.text,
-                   wtypes.text, types.listtype)
-    def get_all(self, limit=None, sort_key='id', sort_dir='asc',
-                fields=None):
-        """Retrieve a list of nics.
-
-        :param limit: maximum number of resources to return in a single result.
-                      This value cannot be larger than the value of max_limit
-                      in the [api] section of the xcat3 configuration, or only
-                      max_limit resources will be returned.
-        :param sort_key: column to sort results by. Default: id.
-        :param sort_dir: direction to sort. "asc" or "desc". Default: asc.
-        :param fields: Optional, a list with a specified set of fields
-                       of the resource to be returned.
-        """
-        if fields is None:
-            fields = ['uuid', 'mac']
-        return self._get_nics_collection(limit, sort_key, sort_dir,
-                                         fields=fields)
+    @expose.expose(types.jsontype)
+    def get_all(self):
+        """Retrieve a list of nics. """
+        db_nics = dbapi.get_nic_list()
+        result = dict()
+        result['nics'] = [{'uuid': nic[0], 'mac': nic[1]} for nic in db_nics]
+        return result
 
     @expose.expose(types.jsontype, body=Nic,
                    status_code=http_client.CREATED)
