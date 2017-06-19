@@ -72,7 +72,7 @@ class XCAT3Object(object_base.VersionedObject):
         """
         for field in self.fields:
             if (self.obj_attr_is_set(field) and
-                    self[field] != loaded_object[field]):
+                        self[field] != loaded_object[field]):
                 self[field] = loaded_object[field]
 
     @staticmethod

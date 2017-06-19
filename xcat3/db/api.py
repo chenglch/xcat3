@@ -43,8 +43,8 @@ class Connection(object):
         """Constructor."""
 
     @abc.abstractmethod
-    def get_nodeinfo_list(self, columns=None, filters=None, limit=None,
-                          sort_key=None, sort_dir=None):
+    def get_nodeinfo_list(self, columns=None, filters=None, sort_key=None,
+                          sort_dir=None):
         """Get specific columns for matching nodes.
 
         Return a list of the specified columns for all nodes that match the
@@ -59,7 +59,6 @@ class Connection(object):
                         :provisioned_before:
                             nodes with provision_updated_at field before this
                             interval in seconds
-        :param limit: Maximum number of nodes to return.
         :param sort_key: Attribute by which results should be sorted.
         :param sort_dir: direction in which results should be sorted.
                          (asc, desc)
@@ -170,20 +169,18 @@ class Connection(object):
         """
 
     @abc.abstractmethod
-    def update_node(self, node_id, values):
+    def update_nodes(self, updates_dict):
         """Update node attributes
 
-        :param node_id: the id of node
-        :values: patch for node
-        :returns: db node
+        :updates_dict: patch for nodes
         """
 
     @abc.abstractmethod
-    def update_nodes(self, node_ids, updates_dict):
-        """Update node attributes
+    def save_nodes(self, node_ids, updates_dict):
+        """Update node attributes for task object
 
-        :param node_ids: the ids of nodes
-        :values: patch for node
+        :node_ids: ids of nodes
+        :updates_dict: patch for node
         :returns: db nodes
         """
 
@@ -229,8 +226,7 @@ class Connection(object):
         """Get network from network name"""
 
     @abc.abstractmethod
-    def get_network_list(self, filters=None, limit=None, sort_key=None,
-                         sort_dir=None):
+    def get_network_list(self, filters=None):
         """Get network list from networks table"""
 
     @abc.abstractmethod

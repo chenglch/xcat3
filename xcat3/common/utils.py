@@ -18,7 +18,6 @@
 #    under the License.
 
 """Utilities and helper functions."""
-
 import contextlib
 import collections
 import datetime
@@ -586,6 +585,20 @@ def singleton(cls):
         return instances[cls]
 
     return _singleton
+
+
+def timeit(method):
+    """Debug funtion"""
+
+    def timed(*args, **kw):
+        ts = time.time()
+        result = method(*args, **kw)
+        te = time.time()
+        LOG.info('%r %2.2f sec' % (method.__name__, te-ts))
+        return result
+
+    return timed
+
 
 
 def fill_result(result, names, message):

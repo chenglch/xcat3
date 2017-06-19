@@ -22,6 +22,7 @@ from wsme import types as wtypes
 from xcat3.db import api as db_api
 from xcat3.common.i18n import _
 
+EXCEPTION_MSG = '%s: Please see the detail in the api log file'
 dbapi = db_api.get_instance()
 
 

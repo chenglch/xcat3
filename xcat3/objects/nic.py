@@ -33,12 +33,12 @@ class Nic(base.XCAT3Object, object_base.VersionedObjectDictCompat):
     dbapi = dbapi.get_instance()
 
     fields = {
-        'id': object_fields.IntegerField(),
+        'id': object_fields.IntegerField(nullable=True),
         'uuid': object_fields.UUIDField(nullable=False),
         'name': object_fields.StringField(nullable=True),
         'node_id': object_fields.IntegerField(nullable=True),
         'mac': object_fields.MACAddressField(nullable=False),
-        'ip': object_fields.StringField(nullable=True),
+        'ip': object_fields.IPAddressField(nullable=True),
         'primary': object_fields.BooleanField(nullable=True),
         'extra': object_fields.FlexibleDictField(nullable=True),
     }
@@ -195,6 +195,15 @@ class Nic(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         """
         current = self.get_by_uuid(self._context, uuid=self.uuid)
         self.obj_refresh(current)
+
+    def validate(self, context=None):
+        """Validate value in Nic fields"""
+        updates = self.obj_get_changes()
+        if not updates.has_key('uuid'):
+            updates['uuid'] = uuidutils.generate_uuid()
+
+        for field in self.fields:
+            self[field] = updates.get(field)
 
     @classmethod
     def to_node_objs_with_nics_info(cls, node_objs):

@@ -311,7 +311,7 @@ class ConductorManager(base_manager.BaseConductorManager):
                 dhcp.ISCDHCPService.update_opts(context, 'add', names,
                                                 dhcp_opts)
                 # update attributes in database
-                objects.Node.update_nodes(nodes)
+                objects.Node.save_nodes(nodes)
             except Exception as e:
                 utils.fill_result(result, names, e.message)
 
@@ -346,7 +346,7 @@ class ConductorManager(base_manager.BaseConductorManager):
             nodes = task.nodes
             try:
                 result = self._process_nodes_worker(_clean, nodes=nodes)
-                objects.Node.update_nodes(nodes)
+                objects.Node.save_nodes(nodes)
             except Exception as e:
                 result = dict()
                 utils.fill_result(result, names, e.message)
@@ -433,4 +433,4 @@ class ConductorManager(base_manager.BaseConductorManager):
             boot_plugin.continue_deploy(node)
             node.state = xcat3_states.DEPLOY_DONE
             node.conductor_affinity = None
-            objects.Node.update_nodes([node])
+            objects.Node.save_nodes([node])

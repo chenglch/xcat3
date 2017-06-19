@@ -15,6 +15,7 @@
 #    under the License.
 
 import ast
+import ipaddress
 import netaddr
 import six
 
@@ -108,8 +109,8 @@ class IPAddress(StringPattern):
     @staticmethod
     def coerce(obj, attr, value):
         try:
-            return netaddr.IPAddress(value)
-        except netaddr.AddrFormatError as e:
+            return ipaddress.ip_address(unicode(value))
+        except ValueError as e:
             raise ValueError(six.text_type(e))
 
     def from_primitive(self, obj, attr, value):

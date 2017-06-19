@@ -51,7 +51,6 @@ _REST_RESOURCE = ('power', 'provision', 'boot_device')
 SYSTEM_KEY = 'system'
 DEFAULT_PASSWORD = 'cluster'
 
-
 ALLOWED_TARGET_POWER_STATES = (xcat3_states.POWER_ON,
                                xcat3_states.POWER_OFF)
 
@@ -253,9 +252,9 @@ class NodeProvisionController(rest.RestController):
 
         if not target.startswith('un_'):
             # Get the rpc object which can transfer via rpc calls
-            if subnet:
+            if subnet is not None:
                 subnet = objects.Network.get_by_name(context, subnet)
-            if osimage:
+            if osimage is not None:
                 osimage = objects.OSImage.get_by_name(context, osimage)
             try:
                 passwd = objects.Passwd.get_by_key(context, SYSTEM_KEY)
@@ -282,7 +281,8 @@ class NodeProvisionController(rest.RestController):
             LOG.exception(_LE(
                 'Unexpected exception while activating dhcp service '
                 '%(err)s'), {'err': six.text_type(traceback.format_exc())})
-            utils.fill_result(result['nodes'], names, e.message)
+            utils.fill_result(result['nodes'], names,
+                              base.EXCEPTION_MSG % e.message)
 
         return types.JsonType.validate(result)
 
@@ -461,15 +461,11 @@ class NodesController(rest.RestController):
         node_obj = api_utils.get_node_obj(node)
         return Node.convert_with_links(node_obj, fields=fields)
 
-    @expose.expose(types.jsontype, int, wtypes.text, wtypes.text, wtypes.text,
+    @expose.expose(types.jsontype, wtypes.text, wtypes.text, wtypes.text,
                    types.listtype)
-    def get_all(self, limit=None, sort_key='id', sort_dir='asc'):
+    def get_all(self, sort_key='id', sort_dir='asc'):
         """Retrieve a list of nodes.
 
-        :param limit: maximum number of resources to return in a single result.
-                      This value cannot be larger than the value of max_limit
-                      in the [api] section of the xcat3 configuration, or only
-                      max_limit resources will be returned.
         :param sort_key: column to sort results by. Default: id.
         :param sort_dir: direction to sort. "asc" or "desc". Default: asc.
         :param fields: Optional, a list with a specified set of fields
@@ -477,8 +473,8 @@ class NodesController(rest.RestController):
         """
         fields = ['name', ]
         # TODO(chenglch): limit is not supported very well
-        db_nodes = dbapi.get_node_list(limit=limit, sort_key=sort_key,
-                                       sort_dir=sort_dir, fields=fields)
+        db_nodes = dbapi.get_node_list(sort_key=sort_key, sort_dir=sort_dir,
+                                       fields=fields)
         results = {'nodes': []}
         results['nodes'] = [node[0] for node in db_nodes]
         return results
@@ -492,17 +488,21 @@ class NodesController(rest.RestController):
         """
 
         def _create_object(node, result):
-            new_node = None
             try:
                 context = pecan.request.context
                 if node.name in _REST_RESOURCE:
                     raise exception.InvalidName(name=node.name)
                 new_node = objects.Node(context, **node.as_dict())
+                new_node.validate(context)
             except Exception as e:
-                result['nodes'][node.name] = e.message
+                result['nodes'][node.name] = base.EXCEPTION_MSG % e.message
+                LOG.exception(_LE(
+                    'Can not create node object due to the error: '
+                    '%(err)s'), {'err': six.text_type(traceback.format_exc())})
+                return None
             else:
                 result['nodes'][node.name] = states.SUCCESS
-            return new_node
+                return new_node
 
         def singal_create(nodes, result):
             """Create node one by one
@@ -513,10 +513,16 @@ class NodesController(rest.RestController):
             """
             for node in nodes:
                 new_node = _create_object(node, result)
+                if new_node is None:
+                    continue
                 try:
                     new_node.create()
                 except Exception as e:
-                    result['nodes'][node.name] = e.message
+                    result['nodes'][node.name] = base.EXCEPTION_MSG % e.message
+                    LOG.exception(_LE(
+                        'Can not create node object due to the error: '
+                        '%(err)s'),
+                        {'err': six.text_type(traceback.format_exc())})
                 else:
                     result['nodes'][node.name] = states.SUCCESS
             return result
@@ -536,8 +542,9 @@ class NodesController(rest.RestController):
             for item in dups:
                 result['nodes'][item] = msg
             nodes = filter(lambda x: x.name not in dups, nodes)
-            new_nodes = [_create_object(node, result) for node in nodes if
-                         node is not None]
+            new_nodes = [_create_object(node, result) for node in
+                         nodes if node is not None]
+            new_nodes = filter(None, new_nodes)
             if new_nodes:
                 objects.Node.create_nodes(new_nodes)
             return result
@@ -604,6 +611,9 @@ class NodesController(rest.RestController):
                 result['nodes'][name] = states.UPDATED
         except Exception() as e:
             for name in names:
-                result['nodes'][name] = e.message
+                result['nodes'][name] = base.EXCEPTION_MSG % e.message
+            LOG.exception(_LE(
+                'Can not create node object due to the error: '
+                '%(err)s'), {'err': six.text_type(traceback.format_exc())})
 
         return result

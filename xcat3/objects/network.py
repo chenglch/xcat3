@@ -63,21 +63,15 @@ class Network(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         return network
 
     @classmethod
-    def list(cls, context=None, limit=None, sort_key=None, sort_dir=None,
-             filters=None, fields=None):
+    def list(cls, context=None, filters=None):
         """Return a list of Network objects.
 
         :param context: Security context.
-        :param limit: maximum number of resources to return in a single result.
-        :param sort_key: column to sort results by.
-        :param sort_dir: direction to sort. "asc" or "desc".
         :param filters: Filters to apply.
         :returns: a list of :class:`Network` object.
 
         """
-        db_networks = cls.dbapi.get_network_list(filters=filters, limit=limit,
-                                                 sort_key=sort_key,
-                                                 sort_dir=sort_dir)
+        db_networks = cls.dbapi.get_network_list(filters=filters)
         networks = cls._from_db_object_list(context, db_networks)
         return networks
 

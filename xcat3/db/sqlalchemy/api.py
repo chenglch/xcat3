@@ -102,15 +102,15 @@ def add_nic_filter(query, value):
         return add_identity_filter(query, value)
 
 
-def _paginate_query(model, limit=None, sort_key=None,
-                    sort_dir=None, query=None):
+def _paginate_query(model, sort_key=None, sort_dir=None, query=None):
     if not query:
         query = model_query(model)
     sort_keys = ['id']
     if sort_key and sort_key not in sort_keys:
         sort_keys.insert(0, sort_key)
     try:
-        query = db_utils.paginate_query(query, model, limit, sort_keys,
+        # limit is None
+        query = db_utils.paginate_query(query, model, None, sort_keys,
                                         sort_dir=sort_dir)
     except db_exc.InvalidSortKey:
         raise exception.InvalidParameterValue(
@@ -145,22 +145,32 @@ class Connection(api.Connection):
                 raise exception.DuplicateName(name=values['name'])
             return node_model
 
-    def create_nodes(self, nodes_values):
-        node_models = []
-        for values in nodes_values:
-            node_model = models.Node()
-            node_model.update(values)
-            nics_info = values.get('nics_info')
-            if nics_info:
-                for nic in nics_info['nics']:
-                    nic_model = models.Nics()
-                    nic['uuid'] = uuidutils.generate_uuid()
-                    nic_model.update(nic)
-                    node_model.nics.append(nic_model)
-            node_models.append(node_model)
+    def create_nodes(self, values):
+        node_dict = {}
+        for value in values:
+            nics_info = value.get('nics_info')
+            if nics_info is not None and nics_info.has_key('nics'):
+                # node name to nic list
+                node_dict[value['name']] = [nic for nic in nics_info['nics']]
+                nics_info['nics'] = None
+
         with _session_for_write() as session:
-            session.add_all(node_models)
-            return node_models
+            session.bulk_insert_mappings(models.Node, values)
+            session.flush()
+
+        query = model_query(models.Node)
+        query = query.with_entities(models.Node.name,
+                                    models.Node.id).filter(
+            models.Node.name.in_(node_dict.keys()))
+        ids = query.all()
+        id_dict = dict((id[0], id[1]) for id in ids)
+        nic_values= []
+        for node, nics in six.iteritems(node_dict):
+            for nic in nics:
+                nic['node_id'] = id_dict[node]
+                nic_values.append(nic)
+        with _session_for_write() as session:
+            session.bulk_insert_mappings(models.Nics, nic_values)
 
     def get_node_by_id(self, node_id):
         query = model_query(models.Node)
@@ -205,8 +215,8 @@ class Connection(api.Connection):
             nics_query.delete(synchronize_session=False)
             query.delete(synchronize_session=False)
 
-    def get_nodeinfo_list(self, columns=None, filters=None, limit=None,
-                          marker=None, sort_key=None, sort_dir=None):
+    def get_nodeinfo_list(self, columns=None, filters=None, marker=None,
+                          sort_key=None, sort_dir=None):
         # list-ify columns default values because it is bad form
         # to include a mutable list in function definitions.
         if columns is None:
@@ -216,14 +226,13 @@ class Connection(api.Connection):
 
         query = model_query(*columns, base_model=models.Node)
         query = self._add_nodes_filters(query, filters)
-        return _paginate_query(models.Node, limit, sort_key, sort_dir, query)
+        return _paginate_query(models.Node, sort_key, sort_dir, query)
 
-    def get_node_list(self, filters=None, limit=None, sort_key=None,
-                      sort_dir=None, fields=None):
+    def get_node_list(self, filters=None, sort_key=None, sort_dir=None,
+                      fields=None):
         if not fields:
             query = model_query(models.Node)
-            return _paginate_query(models.Node, limit, sort_key, sort_dir,
-                                   query)
+            return _paginate_query(models.Node, sort_key, sort_dir, query)
 
         # only query name column, for node list query
         if fields and len(fields) == 1 and fields[0] == 'name':
@@ -317,41 +326,14 @@ class Connection(api.Connection):
             except NoResultFound:
                 raise exception.NodeNotFound(node_id)
 
-    def update_node(self, node_id, values):
-        try:
-            return self._do_update_node(node_id, values)
-        except db_exc.DBDuplicateEntry as e:
-            if 'name' in e.columns:
-                raise exception.DuplicateName(name=values['name'])
-            else:
-                raise
-
-    def _do_update_node(self, node_id, values):
+    def update_nodes(self, updates_dict):
+        for k, v in six.iteritems(updates_dict):
+            v.update({'id': k})
+        mapping = [v for v in updates_dict.values()]
         with _session_for_write() as session:
-            query = model_query(models.Node)
-            query = add_identity_filter(query, node_id)
-            try:
-                node = query.with_lockmode('update').one()
-            except NoResultFound:
-                raise exception.NodeNotFound(node=node_id)
+            session.bulk_update_mappings(models.Node, mapping)
 
-            node.update(values)
-            nics_info = values.get('nics_info')
-            if nics_info:
-                nics = self.get_nics_by_node_id(node.id)
-                for nic in nics:
-                    self.destroy_nic(nic.id)
-
-                for nic in nics_info['nics']:
-                    nics = models.Nics()
-                    nic['node_id'] = node.id
-                    nic['uuid'] = uuidutils.generate_uuid()
-                    nics.update(nic)
-                    session.add(nics)
-                    session.flush()
-        return node
-
-    def update_nodes(self, node_ids, updates_dict):
+    def save_nodes(self, node_ids, updates_dict):
         with _session_for_write() as session:
             query = model_query(models.Node).filter(models.Node.id.in_(
                 node_ids))
@@ -362,8 +344,10 @@ class Connection(api.Connection):
             for node in nodes:
                 node.update(updates_dict[node.id])
                 node_models.append(node)
+
             session.add_all(node_models)
-            return node_models
+            session.flush()
+        return node_models
 
     def create_nic(self, values):
         if not values.get('uuid'):
@@ -404,7 +388,7 @@ class Connection(api.Connection):
 
     def get_nic_list(self):
         query = model_query(models.Nics)
-        query = query.with_entities(models.Nics.uuid,models.Nics.mac)
+        query = query.with_entities(models.Nics.uuid, models.Nics.mac)
         return query.all()
 
     def get_nics_by_node_id(self, node_id, limit=None, sort_key=None,
@@ -461,11 +445,9 @@ class Connection(api.Connection):
         except NoResultFound:
             raise exception.NetworkNotFound(net=name)
 
-    def get_network_list(self, filters=None, limit=None, sort_key=None,
-                         sort_dir=None):
+    def get_network_list(self, filters=None):
         query = model_query(models.Networks)
-        return _paginate_query(models.Networks, limit, sort_key, sort_dir,
-                               query)
+        return query.all()
 
     def create_network(self, values):
         network = models.Networks()
@@ -505,28 +487,20 @@ class Connection(api.Connection):
     def save_or_update_dhcp(self, names, dhcp_opts):
         # As there is already lock for each node, consistency is ignored here.
         with _session_for_write() as session:
-            query = model_query(models.DHCP).filter(models.DHCP.name.in_(
-                names))
+            query = model_query(models.DHCP.name).filter(models.DHCP.name.in_(names))
             nodes = query.all()
             if nodes:
-                node_models = []
+                mapping = []
                 for node in nodes:
-                    temp_opt = {'name': node.name,
-                                'opts': dhcp_opts[node.name]}
-                    node.update(temp_opt)
+                    node_opt = {'name': node[0],
+                                'opts': dhcp_opts[node[0]]}
                     dhcp_opts.pop(node.name)
-                    node_models.append(node)
-                session.add_all(node_models)
+                    mapping.append(node_opt)
+                session.bulk_update_mappings(models.DHCP, mapping)
 
-        node_models = []
-        for k, v in six.iteritems(dhcp_opts):
-            node_model = models.DHCP()
-            temp_opt = {'name': k,
-                        'opts': v}
-            node_model.update(temp_opt)
-            node_models.append(node_model)
+        mapping = [{'name':k, 'opts': v} for k, v in six.iteritems(dhcp_opts)]
         with _session_for_write() as session:
-            session.add_all(node_models)
+            session.bulk_insert_mappings(models.DHCP, mapping)
 
     def destroy_dhcp(self, names):
         with _session_for_write() as session:

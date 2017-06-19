@@ -105,26 +105,6 @@ class NetworkCollection(collection.Collection):
 class NetworkController(rest.RestController):
     invalid_sort_key_list = ['name']
 
-    def _get_networks_collection(self, limit=1000, sort_key='id',
-                                 sort_dir='asc', fields=None):
-
-        limit = api_utils.validate_limit(limit)
-        sort_dir = api_utils.validate_sort_dir(sort_dir)
-
-        if sort_key in self.invalid_sort_key_list:
-            raise exception.InvalidParameterValue(
-                _("The sort_key value %(key)s is an invalid field for "
-                  "sorting") % {'key': sort_key})
-        filters = {}
-        networks = objects.Network.list(pecan.request.context, limit,
-                                        sort_key=sort_key, sort_dir=sort_dir,
-                                        filters=filters, fields=None)
-
-        parameters = {'sort_key': sort_key, 'sort_dir': sort_dir}
-        return NetworkCollection.convert_with_links(networks, limit,
-                                                    fields=fields,
-                                                    **parameters)
-
     def _update_changed_fields(self, network, network_obj):
         """Update rpc_network based on changed fields in a network.
 
@@ -145,16 +125,11 @@ class NetworkController(rest.RestController):
         network_obj = objects.Network.get_by_name(context, name)
         return Network.convert_with_links(network_obj, fields=fields)
 
-    @expose.expose(NetworkCollection, int, wtypes.text, wtypes.text,
+    @expose.expose(NetworkCollection, wtypes.text, wtypes.text,
                    wtypes.text, types.listtype)
-    def get_all(self, limit=None, sort_key='id', sort_dir='asc',
-                fields=None):
+    def get_all(self, fields=None):
         """Retrieve a list of networks.
 
-        :param limit: maximum number of resources to return in a single result.
-                      This value cannot be larger than the value of max_limit
-                      in the [api] section of the xcat3 configuration, or only
-                      max_limit resources will be returned.
         :param sort_key: column to sort results by. Default: id.
         :param sort_dir: direction to sort. "asc" or "desc". Default: asc.
         :param fields: Optional, a list with a specified set of fields
@@ -162,8 +137,8 @@ class NetworkController(rest.RestController):
         """
         if fields is None:
             fields = ['name']
-        return self._get_networks_collection(limit, sort_key, sort_dir,
-                                             fields=fields)
+        networks = objects.Network.list(pecan.request.context, filters={})
+        return NetworkCollection.convert_with_links(networks, fields=fields)
 
     @expose.expose(types.jsontype, body=Network,
                    status_code=http_client.CREATED)

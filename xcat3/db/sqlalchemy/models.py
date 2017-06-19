@@ -83,9 +83,9 @@ class Node(Base):
         schema.UniqueConstraint('name', name='uniq_nodes0name'),
         table_args())
     id = Column(Integer, primary_key=True)
-    name = Column(String(255))
-    mgt = Column(String(16))
-    netboot = Column(String(16))
+    name = Column(String(255), nullable=False)
+    mgt = Column(String(16), nullable=False)
+    netboot = Column(String(16), nullable=False)
     arch = Column(String(16), nullable=True)
     type = Column(String(16), nullable=True)
     state = Column(String(16), nullable=True)

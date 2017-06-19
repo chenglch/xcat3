@@ -29,13 +29,14 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
     dbapi = db_api.get_instance()
 
     fields = {
-        'id': object_fields.IntegerField(),
-        'name': object_fields.StringField(nullable=True),
+        # id may be None while construct the ndoe object
+        'id': object_fields.IntegerField(nullable=True),
+        'name': object_fields.StringField(),
         'arch': object_fields.StringField(nullable=True),
-        'netboot': object_fields.StringField(),
+        'netboot': object_fields.StringField(nullable=False),
         'type': object_fields.StringField(nullable=True),
         'reservation': object_fields.StringField(nullable=True),
-        'mgt': object_fields.StringField(),
+        'mgt': object_fields.StringField(nullable=True),
         'state': object_fields.StringField(nullable=True),
         'nics_info': object_fields.FlexibleDictField(nullable=True),
         'osimage_info': object_fields.FlexibleDictField(nullable=True),
@@ -85,19 +86,18 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         return node
 
     @classmethod
-    def list(cls, context, limit=None, sort_key=None, sort_dir=None,
-             filters=None, fields=None):
+    def list(cls, context, sort_key=None, sort_dir=None, filters=None,
+             fields=None):
         """Return a list of Node objects.
 
         :param context: Security context.
-        :param limit: maximum number of resources to return in a single result.
         :param sort_key: column to sort results by.
         :param sort_dir: direction to sort. "asc" or "desc".
         :param filters: Filters to apply.
         :returns: a list of :class:`Node` object.
 
         """
-        db_nodes = cls.dbapi.get_node_list(filters=filters, limit=limit,
+        db_nodes = cls.dbapi.get_node_list(filters=filters,
                                            sort_key=sort_key,
                                            sort_dir=sort_dir,
                                            fields=fields)
@@ -154,7 +154,8 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         :raises: InvalidParameterValue if some property values are invalid.
         """
         values = self.obj_get_changes()
-        self.dbapi.create_node(values)
+        db_node = self.dbapi.create_node(values)
+        self._from_db_object(self, db_node)
 
     @classmethod
     def create_nodes(cls, nodes_values):
@@ -162,7 +163,20 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         for node in nodes_values:
             value = node.obj_get_changes()
             values.append(value)
-        cls.dbapi.create_nodes(values)
+        db_nodes = cls.dbapi.create_nodes(values)
+
+    def validate(self, context):
+        """validate node properties before creating or updating nodes"""
+        value = self.obj_get_changes()
+        for field in self.fields:
+            self[field] = value.get(field)
+
+        if self['nics_info'] and self['nics_info'].has_key('nics'):
+            nics = self['nics_info']['nics']
+            for nic in nics:
+                nic_obj = nic_object.Nic(context, **nic)
+                nic_obj.validate(context)
+
 
     def destroy(self, context=None):
         """Delete the Node from the DB.
@@ -195,32 +209,30 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
 
     @classmethod
     def update_nodes(cls, nodes):
+        """Update nodes attributes, used for patch interface
+
+        :param nodes: the node objects
+
+        """
         updates_dict = {}
+        for node in nodes:
+            updates = node.obj_get_changes()
+            updates_dict[node.id] = updates
+        cls.dbapi.update_nodes(updates_dict)
+
+    @classmethod
+    def save_nodes(cls, nodes, context=None):
+        """Save updates to nodes with task manager
+
+
+        :param nodes: the nodes contains changes
+        :param context: Security context.
+        :raises: InvalidParameterValue if some property values are invalid.
+        """
         node_ids = []
+        updates_dict = {}
         for node in nodes:
             updates = node.obj_get_changes()
             updates_dict[node.id] = updates
             node_ids.append(node.id)
-        db_nodes = cls.dbapi.update_nodes(node_ids, updates_dict)
-
-
-    def save(self, context=None):
-        """Save updates to this Node.
-
-        Column-wise updates will be made based on the result of
-        self.what_changed(). If target_power_state is provided,
-        it will be checked against the in-database copy of the
-        node before updates are made.
-
-        :param context: Security context. NOTE: This should only
-                        be used internally by the indirection_api.
-                        Unfortunately, RPC requires context as the first
-                        argument, even though we don't use it.
-                        A context should be set when instantiating the
-                        object, e.g.: Node(context)
-        :raises: InvalidParameterValue if some property values are invalid.
-        """
-        updates = self.obj_get_changes()
-        db_node = self.dbapi.update_node(self.id, updates)
-        self.updated_at = db_node['updated_at']
-        self.obj_reset_changes()
+        cls.dbapi.save_nodes(node_ids, updates_dict)
