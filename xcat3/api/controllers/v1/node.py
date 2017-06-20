@@ -137,8 +137,6 @@ class Node(base.APIBase):
     type = wsme.wsattr(wtypes.text)
     arch = wsme.wsattr(wtypes.text)
     state = wsme.wsattr(wtypes.text)
-    osimage_name = wsme.wsattr(wtypes.text)
-    scripts_name = wsme.wsattr(wtypes.text)
     control_info = {wtypes.text: types.jsontype}
     console_info = {wtypes.text: types.jsontype}
     nics_info = {wtypes.text: types.jsontype}
@@ -156,26 +154,31 @@ class Node(base.APIBase):
                 setattr(self, k, kwargs.get(k, wtypes.Unset))
 
     @staticmethod
-    def convert_with_links(node, fields=None):
+    def convert_with_links(node, fields):
         node = Node(**node.as_dict())
         node.filter_fields(fields, _UNSET_NODE_FIELDS)
         return node
 
     @classmethod
-    def sample(cls, expand=True):
-        time = datetime.datetime(2000, 1, 1, 12, 0, 0)
-        name = 'database16-dc02'
-        sample = cls(name=name,
-                     last_error=None,
-                     updated_at=time,
-                     created_at=time,
-                     reservation=None)
-        fields = None if expand else _DEFAULT_RETURN_FIELDS
-        return cls.convert_with_links(sample, fields=fields)
-
-    @classmethod
     def get_api_node(cls, node_name):
         return cls(name=node_name)
+
+    @classmethod
+    def get_node_detail(cls, context, dct, fields):
+        if dct.has_key('conductor_affinity') and dct[
+            'conductor_affinity'] is not None:
+            #TODO: As conductor do not have object related, use dbapi directly
+            cond = dbapi.get_service_from_id(dct['conductor_affinity'])
+            del dct['conductor_affinity']
+            dct['conductor'] = cond.hostname
+
+        if dct.has_key('osimage_id') and dct['osimage_id'] is not None:
+            osimage = objects.OSImage.get_by_id(context, dct['osimage_id'])
+            del dct['osimage_id']
+            dct['osimage'] = osimage.name
+
+        cls.filter_dict(dct, fields, _UNSET_NODE_FIELDS)
+        return dct
 
 
 class NodePatchType(types.JsonPatchType):
@@ -210,11 +213,36 @@ class NodeCollection(collection.Collection):
         return collection
 
     @classmethod
-    def sample(cls):
-        sample = cls()
-        node = Node.sample(expand=False)
-        sample.nodes = [node]
-        return sample
+    def get_nodes_detail(cls, context, nodes, fields):
+        osimage_cache = {}
+        cond_cache = {}
+        ret = {'nodes': []}
+        # TODO: if fields do not contains `conductor` or `osimage` do not
+        # construct them from database.
+        for node in nodes:
+            dct = node.as_dict()
+            cond_id = dct.get('conductor_affinity')
+            if cond_id is not None:
+                # TODO: As conductor do not have object related, use dbapi
+                # directly
+                cond = cond_cache.get(cond_id)
+                if cond is None:
+                    cond = dbapi.get_service_from_id(cond_id)
+                    cond_cache[cond_id] = cond
+                del dct['conductor_affinity']
+                dct['conductor'] = cond.hostname
+
+            osimage_id = dct.get('osimage_id')
+            if osimage_id is not None:
+                osimage = osimage_cache.get(osimage_id)
+                if osimage is None:
+                    osimage = objects.OSImage.get_by_id(context,osimage_id)
+                    osimage_cache[osimage_id] = osimage
+                del dct['osimage_id']
+                dct['osimage'] = osimage.name
+            cls.filter_dict(dct, fields, _UNSET_NODE_FIELDS)
+            ret['nodes'].append(dct)
+        return ret
 
 
 class NodeProvisionController(rest.RestController):
@@ -415,25 +443,6 @@ class NodesController(rest.RestController):
         node_obj = api_utils.get_node_obj(node)
         node_obj.destroy()
 
-    def _get_nodes_collection(self, names, limit=None, sort_key='id',
-                              sort_dir='asc', fields=None):
-
-        limit = api_utils.validate_limit(limit)
-        sort_dir = api_utils.validate_sort_dir(sort_dir)
-
-        if sort_key in self.invalid_sort_key_list:
-            raise exception.InvalidParameterValue(
-                _("The sort_key value %(key)s is an invalid field for "
-                  "sorting") % {'key': sort_key})
-
-        nodes = objects.Node.list_in(pecan.request.context, names,
-                                     obj_info=fields)
-
-        parameters = {'sort_key': sort_key, 'sort_dir': sort_dir}
-        return NodeCollection.convert_with_links(nodes, limit,
-                                                 fields=fields,
-                                                 **parameters)
-
     def _update_changed_fields(self, node, node_obj):
         """Update rpc_node based on changed fields in a node.
 
@@ -448,18 +457,22 @@ class NodesController(rest.RestController):
             if node_obj[field] != patch_val:
                 node_obj[field] = patch_val
 
-    @expose.expose(NodeCollection, types.listtype, body=NodeCollection)
+    @expose.expose(types.jsontype, types.listtype, body=NodeCollection)
     def info(self, fields=None, nodes=None):
-        if not fields:
-            fields = ['nics', ]
         names = [node.name for node in nodes.nodes if node.name]
-        return self._get_nodes_collection(names, limit=None, fields=fields)
+        context = pecan.request.context
+        obj_info = []
+        if fields is None or 'nics_info' in fields:
+            obj_info = ['nics']
+        nodes = objects.Node.list_in(context, names, obj_info=obj_info)
+        return NodeCollection.get_nodes_detail(context, nodes, fields)
 
-    @expose.expose(Node, types.name, types.listtype)
+    @expose.expose(types.jsontype, types.name, types.listtype)
     def get_one(self, node_name, fields=None):
+        context = pecan.request.context
         node = Node.get_api_node(node_name)
-        node_obj = api_utils.get_node_obj(node)
-        return Node.convert_with_links(node_obj, fields=fields)
+        node_dict= api_utils.get_node_obj(node).as_dict()
+        return Node.get_node_detail(context, node_dict, fields)
 
     @expose.expose(types.jsontype, wtypes.text, wtypes.text, wtypes.text,
                    types.listtype)

@@ -56,6 +56,25 @@ class APIBase(wtypes.Base):
             if k in remove_list:
                 setattr(self, k, wsme.Unset)
 
+    @classmethod
+    def filter_dict(cls, dct, show_list=None, remove_list=None):
+        """Unset fields so they don't appear in the message body.
+
+        :param dct: A dict contains the return fields.
+        :param show_list: A list of fields that won't be touched.
+        :param remove_list: A list of fields will be hide.
+        """
+        if remove_list is None:
+            remove_list = []
+        remove_list = list(remove_list)
+        if show_list:
+            remove_list.extend(
+                [key for key in dct.keys() if key not in show_list])
+
+        for key in remove_list:
+            if dct.has_key(key):
+                del dct[key]
+
 
 @functools.total_ordering
 class Version(object):

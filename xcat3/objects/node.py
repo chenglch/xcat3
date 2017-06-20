@@ -39,14 +39,11 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         'mgt': object_fields.StringField(nullable=True),
         'state': object_fields.StringField(nullable=True),
         'nics_info': object_fields.FlexibleDictField(nullable=True),
-        'osimage_info': object_fields.FlexibleDictField(nullable=True),
         'scripts_info': object_fields.FlexibleDictField(nullable=True),
         'control_info': object_fields.FlexibleDictField(nullable=True),
         'console_info': object_fields.FlexibleDictField(nullable=True),
         'conductor_affinity': object_fields.IntegerField(nullable=True),
         'osimage_id': object_fields.IntegerField(nullable=True),
-        # NOTE: passwd_id is not used currently
-        'passwd_id': object_fields.IntegerField(nullable=True),
     }
 
     @classmethod

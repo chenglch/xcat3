@@ -1,4 +1,5 @@
 # Copyright 2013 UnitedStack Inc.
+# Updated 2017 for xcat test purpose
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -72,6 +73,7 @@ class Nic(base.APIBase):
 
         # never expose the node_id attribute
         nic.node_id = wtypes.Unset
+        nic.ip = unicode(nic.ip)
         return nic
 
     @classmethod
