@@ -6,3 +6,6 @@ DISK = 'disk'
 
 CDROM = 'cdrom'
 "Boot from CD/DVD"
+
+UNKNOWN = 'unknown'
+'Boot device is unknown'

@@ -43,6 +43,9 @@ POWER_ON = 'on'
 POWER_OFF = 'off'
 """ Node is powered off. """
 
+REBOOT = 'boot'
+""" Node is rebooting. """
+
 ################
 # Request states
 ################

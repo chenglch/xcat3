@@ -36,17 +36,6 @@ class ControlInterface(base.BaseInterface):
         """
 
     @abc.abstractmethod
-    def reboot(self, node):
-        """Perform a hard reboot of the node's node.
-
-        Drivers are expected to properly handle case when node is powered off
-        by powering it on.
-
-        :param node: the node to act on.
-        :raises: MissingParameterValue if a required parameter is missing.
-        """
-
-    @abc.abstractmethod
     def get_boot_device(self, node):
         """get the boot device of node.
 

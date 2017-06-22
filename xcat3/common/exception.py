@@ -345,9 +345,14 @@ class ThreadConflict(Conflict):
     _msg_fmt = _(
         "There is anonther thread is running for this job, exit %(thread)s.")
 
-class TimeoutException(XCAT3Exception):
-    _msg_fmt = _("Time out occurs after running func %(func) for %(time)d "
-                 "seconds")
 
 class InvalidPasswd(Invalid):
     _msg_fmt = _("%(err)s.")
+
+
+class IPMIFailure(XCAT3Exception):
+    _msg_fmt = _("IPMI call failed: %(cmd)s.")
+
+
+class PowerStateFailure(InvalidState):
+    _msg_fmt = _("Failed to set node power state to %(pstate)s.")

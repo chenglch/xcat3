@@ -1,5 +1,6 @@
 # coding=utf-8
 # Copyright 2013 Hewlett-Packard Development Company, L.P.
+# Updated 2017 for xcat test purpose
 # All Rights Reserved.
 #
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
@@ -29,7 +30,6 @@ import os
 from oslo_concurrency import processutils
 from oslo_log import log as logging
 from oslo_utils import excutils
-from oslo_utils import strutils
 
 import retrying
 
@@ -38,8 +38,6 @@ from xcat3.common import exception
 from xcat3.common.i18n import _, _LE, _LW
 from xcat3.common import states
 from xcat3.common import utils
-from xcat3.conductor import task_manager
-from xcat3.conf import CONF
 from xcat3.plugins.control import base
 from xcat3.plugins import utils as plugin_utils
 
@@ -539,6 +537,9 @@ class SSHControl(base.ControlInterface):
             state = _power_on(ssh_obj, control_info)
         elif pstate == states.POWER_OFF:
             state = _power_off(ssh_obj, control_info)
+        elif pstate == states.REBOOT:
+            state = _power_on(ssh_obj, control_info)
+            pstate = states.POWER_ON
         else:
             raise exception.InvalidParameterValue(
                 _("set_power_state called with invalid power state %s."
@@ -546,31 +547,6 @@ class SSHControl(base.ControlInterface):
 
         if state != pstate:
             raise exception.PowerStateFailure(pstate=pstate)
-
-    def reboot(self, node):
-        """Cycles the power to the node.
-
-        Power cycles a node.
-
-        :param task: a TaskManager instance containing the node to act on.
-        :raises: InvalidParameterValue if any connection parameters are
-            incorrect.
-        :raises: MissingParameterValue when a required parameter is missing
-        :raises: NodeNotFound if could not find a VM corresponding to any
-            of the provided MACs.
-        :raises: PowerStateFailure if it failed to set power state to POWER_ON.
-        :raises: SSHCommandFailed on an error from ssh.
-        :raises: SSHConnectFailed if ssh failed to connect to the node.
-        """
-        control_info = _parse_control_info(node)
-        control_info['macs'] = plugin_utils.get_mac_addresses(node)
-        ssh_obj = _get_connection(node)
-
-        # _power_on will turn the power off if it's already on.
-        state = _power_on(ssh_obj, control_info)
-
-        if state != states.POWER_ON:
-            raise exception.PowerStateFailure(pstate=states.POWER_ON)
 
     def set_boot_device(self, node, device):
         """Set the boot device for the task's node.
