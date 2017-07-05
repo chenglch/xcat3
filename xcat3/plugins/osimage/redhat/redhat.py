@@ -4,7 +4,8 @@ import os
 import shutil
 from oslo_config import cfg
 from oslo_concurrency import lockutils
-from xcat3.plugins.os import base
+from xcat3.plugins import utils as plugin_utils
+from xcat3.plugins.osimage import base
 
 CONF = cfg.CONF
 
@@ -31,9 +32,9 @@ class RedhatInterface(base.BaseOSImage):
         :returns command line string for os repo
         """
         opts = []
-        mirror = '%s%s/%s' % (osimage.distro, osimage.ver, osimage.arch)
         opts.append('inst.ks=http://%s/install/autoinst/'
                     '%s' % (CONF.conductor.host_ip, node.name))
-        opts.append('inst.repo=http://%s/install/%s' % (CONF.conductor.host_ip,
-                                                        mirror))
+        opts.append('inst.repo=http://%s/install/'
+                    '%s' % (CONF.conductor.host_ip,
+                            plugin_utils.get_mirror(osimage)))
         return ' '.join(opts)

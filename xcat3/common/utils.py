@@ -310,6 +310,17 @@ def unlink_without_raise(path):
                         {'path': path, 'e': e})
 
 
+def rmdir_without_raise(path):
+    try:
+        os.rmdir(path)
+    except OSError as e:
+        if e.errno == errno.ENOENT:
+            return
+        else:
+            LOG.warning("Failed to rmdir %(path)s, error: %(e)s",
+                        {'path': path, 'e': e})
+
+
 def safe_rstrip(value, chars=None):
     """Removes trailing characters from a string if that does not make it empty
 

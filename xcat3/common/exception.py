@@ -201,10 +201,6 @@ class ServiceNotFound(NotFound):
     _msg_fmt = _("Service %(service)s could not be found.")
 
 
-class ServiceNotExist(NotFound):
-    _msg_fmt = _("Could not find any conductor nodes")
-
-
 class NodeNotAvailable(NotFound):
     _msg_fmt = _("Node %(node)s is not available.")
 
@@ -214,28 +210,32 @@ class Conflict(XCAT3Exception):
     code = http_client.CONFLICT
 
 
-class DuplicateName(Conflict):
+class DuplicateName(Invalid):
     _msg_fmt = _("A node with name %(name)s already exists.")
 
 
-class MACAlreadyExists(Conflict):
+class MACAlreadyExists(Invalid):
     _msg_fmt = _("A nic with MAC address %(mac)s already exists.")
 
 
-class NicAlreadyExists(Conflict):
+class NicAlreadyExists(Invalid):
     _msg_fmt = _("A nic with UUID %(uuid)s already exists.")
 
 
-class NetworkAlreadyExists(Conflict):
+class NetworkAlreadyExists(Invalid):
     _msg_fmt = _("A network with name %(name)s already exists.")
 
 
-class OSImageAlreadyExists(Conflict):
+class OSImageAlreadyExists(Invalid):
     _msg_fmt = _("A image with name %(name)s already exists.")
 
 
-class PasswdAlreadyExists(Conflict):
+class PasswdAlreadyExists(Invalid):
     _msg_fmt = _("A passwd with key %(key)s already exists.")
+
+
+class ResourceInUsing(Invalid):
+    _msg_fmt = _("Resource %(res)s is using by %(target)s")
 
 
 class NotAuthorized(XCAT3Exception):
@@ -254,11 +254,6 @@ class OperationNotPermitted(NotAuthorized):
 class Invalid(XCAT3Exception):
     _msg_fmt = _("Unacceptable parameters.")
     code = http_client.BAD_REQUEST
-
-
-class Conflict(XCAT3Exception):
-    _msg_fmt = _('Conflict.')
-    code = http_client.CONFLICT
 
 
 class TemporaryFailure(XCAT3Exception):
@@ -325,11 +320,15 @@ class SSHConnectFailed(XCAT3Exception):
     _msg_fmt = _("Failed to establish SSH connection to host %(host)s.")
 
 
-class SSHCommandFailed(XCAT3Exception):
+class CommandFailed(XCAT3Exception):
+    _msg_fmt = _("Failed to execute command: %(cmd)s.")
+
+
+class SSHCommandFailed(CommandFailed):
     _msg_fmt = _("Failed to execute command via SSH: %(cmd)s.")
 
 
-class InvalidState(Conflict):
+class InvalidState(Invalid):
     _msg_fmt = _("Invalid resource state.")
 
 
@@ -356,3 +355,7 @@ class IPMIFailure(XCAT3Exception):
 
 class PowerStateFailure(InvalidState):
     _msg_fmt = _("Failed to set node power state to %(pstate)s.")
+
+
+class UnExpectedError(XCAT3Exception):
+    _msg_fmt = "%(err)s."

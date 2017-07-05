@@ -66,7 +66,7 @@ class ConductorAPI(object):
         Spawns a greenthread if there are free slots in pool, otherwise raises
         exception. Execution control returns immediately to the caller.
         :param func: the function should be called within green thread
-        :returns: Future object.
+        :returns: Future list.
         :raises: NoFreeServiceWorker if worker pool is currently full.
 
         """
@@ -244,6 +244,20 @@ class ConductorAPI(object):
             futures.extend(temp)
 
         return futures
+
+    def destroy_osimage(self, context, osimage):
+        """Destroy osimage on the conductor hosts
+
+        :param context: request context.
+        :param func_name: function name running on the manager hosts
+
+        """
+        services = self.dbapi.get_services(type='conductor')
+        for s in services:
+            topic = '%s.%s' % (self.topic, s.hostname.encode('utf-8'))
+            cctxt = self.client.prepare(topic=topic or self.topic,
+                                        version='1.0')
+            cctxt.cast(context, 'destroy_osimage', osimage=osimage)
 
     def change_power_state(self, context, names, target):
         """Change a node's power state.

@@ -12,13 +12,10 @@ from xcat3.common import service
 from xcat3.conf import CONF
 from xcat3.copycd import copycds
 
+
 class CopycdsCommand(object):
     def create(self):
-        copycds.create(iso=CONF.command.iso, image=CONF.command.image,
-                       install_dir=CONF.command.install)
-
-    def delete(self):
-        pass
+        copycds.create(iso=CONF.command.iso, image=CONF.command.image)
 
 
 def add_command_parsers(subparsers):
@@ -30,15 +27,7 @@ def add_command_parsers(subparsers):
     parser.set_defaults(func=command_object.create)
     parser.add_argument('-n', '--image', nargs='?',
                         help=_("The image name store in xCAT3 system"))
-    parser.add_argument('--install', nargs='?',
-                        help=_("Install direcotory of image"))
     parser.add_argument('iso', help="The iso file path for operation system")
-    # delete
-    parser = subparsers.add_parser('delete',
-                                   help=_("Delete netboot image."))
-
-    parser.add_argument('--image')
-    parser.set_defaults(func=command_object.delete)
 
 
 command_opt = cfg.SubCommandOpt('command',
@@ -50,11 +39,13 @@ CONF.register_cli_opt(command_opt)
 
 
 def main():
-    # this is hack to work with previous usage of xcat3-dbsync
-    # pls change it to xcat3-dbsync upgrade
-    valid_commands = set(['create', 'delete'])
+    # Only allow create subcommand for copycds command. `create` is also
+    # optional argument as it is the default one.
+    # `osimage` interface will handle the list, update and delete operation
+    # on the image.
+    valid_commands = set(['create', ])
     if not set(sys.argv) & valid_commands:
-        sys.argv.append('create')
+        sys.argv.insert(1, 'create')
 
     service.prepare_service(sys.argv)
     CONF.command.func()

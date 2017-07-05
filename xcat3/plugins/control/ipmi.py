@@ -24,7 +24,6 @@ from xcat3.common import exception
 from xcat3.common.i18n import _, _LE, _LI, _LW
 from xcat3.common import states
 from xcat3.common import boot_device
-from xcat3.conf import CONF
 
 LOG = log.getLogger(__name__)
 

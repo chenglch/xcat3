@@ -215,42 +215,39 @@ class Connection(api.Connection):
             nics_query.delete(synchronize_session=False)
             query.delete(synchronize_session=False)
 
-    def get_nodeinfo_list(self, columns=None, filters=None, marker=None,
-                          sort_key=None, sort_dir=None):
-        # list-ify columns default values because it is bad form
-        # to include a mutable list in function definitions.
-        if columns is None:
-            columns = [models.Node.id]
-        else:
-            columns = [getattr(models.Node, c) for c in columns]
-
-        query = model_query(*columns, base_model=models.Node)
-        query = self._add_nodes_filters(query, filters)
-        return _paginate_query(models.Node, sort_key, sort_dir, query)
-
     def get_node_list(self, filters=None, sort_key=None, sort_dir=None,
                       fields=None):
-        if not fields:
+        if filters is None:
+            filters = []
+
+        if fields is None:
             query = model_query(models.Node)
             return _paginate_query(models.Node, sort_key, sort_dir, query)
 
         # only query name column, for node list query
-        if fields and len(fields) == 1 and fields[0] == 'name':
+        if fields is not None and len(fields) == 1 and fields[0] == 'name':
             query = model_query(models.Node.name)
+            if 'osimage_id' in filters:
+                query = query.filter_by(osimage_id=filters['osimage_id'])
             return query.all()
 
     def get_node_in(self, node_names, filters=None, fields=None):
-        if fields and len(fields) == 1 and 'name' in fields and filters \
-                and 'not_reservation' in filters:
+        if filters is None:
+            filters = []
+        if fields is None:
+            fields = []
+
+        if len(fields) == 1 and 'name' in fields and \
+                        'not_reservation' in filters:
             query = model_query(models.Node.name).filter(models.Node.name.in_(
                 node_names)).filter(models.Node.reservation.isnot(None))
-        elif fields and len(fields) == 1 and 'name' in fields:
+        elif len(fields) == 1 and 'name' in fields:
             query = model_query(models.Node.name).filter(models.Node.name.in_(
                 node_names))
         else:
             query = model_query(models.Node).filter(models.Node.name.in_(
                 node_names))
-        if filters and 'reservation' in filters:
+        if 'reservation' in filters:
             query = query.filter_by(reservation=None)
         return query.all()
 
@@ -613,6 +610,15 @@ class Connection(api.Connection):
             return query.one()
         except NoResultFound:
             raise exception.OSImageNotFound(image=name)
+
+    def get_image_by_disto_info(self, distro, ver, arch):
+        query = model_query(models.OSImage)
+        query = query.filter_by(distro=distro, ver=ver, arch=arch)
+        try:
+            return query.one()
+        except NoResultFound:
+            raise exception.OSImageNotFound(
+                image='%s%s-%s' % (distro, ver, arch))
 
     def get_image_list(self):
         query = model_query(models.OSImage)

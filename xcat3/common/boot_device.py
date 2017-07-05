@@ -9,3 +9,5 @@ CDROM = 'cdrom'
 
 UNKNOWN = 'unknown'
 'Boot device is unknown'
+
+BOOT_DEVS = (NET, DISK, CDROM, UNKNOWN)

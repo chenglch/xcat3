@@ -10,6 +10,7 @@ from oslo_config import cfg
 
 from xcat3.common import utils
 from xcat3.plugins import base
+from xcat3.plugins import utils as plugin_utils
 from oslo_utils import fileutils
 from oslo_concurrency import lockutils
 
@@ -120,8 +121,7 @@ class BaseOSImage(OSImageInterface):
                 'mac': node.mac,
                 'install_dir': '/install',
                 'timezone': 'US/Eastern', 'pkg_list': self.packages,
-                'mirror': '%s%s/%s' % (osimage.distro, osimage.ver,
-                                       osimage.arch),
+                'mirror': plugin_utils.get_mirror(osimage),
                 'password': password,
                 'api_ip': CONF.api.host_ip,
                 'api_port': CONF.api.port,
@@ -132,7 +132,7 @@ class BaseOSImage(OSImageInterface):
         utils.write_to_file(node_tmpl, cfg)
 
     def clean(self, node):
-        """Clean up the files while deploying"""
+        """Clean up the files for deploying node"""
         utils.unlink_without_raise(os.path.join(AUTOINST_DIR, node.name))
 
     def build_os_boot_str(self, node, osimage):

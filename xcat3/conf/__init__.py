@@ -22,8 +22,6 @@ from xcat3.conf import database
 from xcat3.conf import default
 from xcat3.conf import deploy
 from xcat3.conf import network
-from xcat3.conf import ipmi
-
 
 CONF = cfg.CONF
 
@@ -33,4 +31,3 @@ database.register_opts(CONF)
 default.register_opts(CONF)
 deploy.register_opts(CONF)
 network.register_opts(CONF)
-ipmi.register_opts(CONF)

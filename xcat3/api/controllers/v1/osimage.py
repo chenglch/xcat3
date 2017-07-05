@@ -32,10 +32,12 @@ from xcat3.api.controllers.v1 import collection
 from xcat3.api.controllers.v1 import utils as api_utils
 from xcat3.common.i18n import _, _LE, _LI, _LW
 from xcat3 import objects
+from xcat3.plugins import utils as plugin_utils
 
 CONF = xcat3.conf.CONF
 
 LOG = log.getLogger(__name__)
+dbapi = base.dbapi
 
 
 class OSImage(base.APIBase):
@@ -46,13 +48,13 @@ class OSImage(base.APIBase):
     """
     name = wsme.wsattr(wtypes.text, mandatory=True)
     """The name of image"""
-    ver = wsme.wsattr(wtypes.text)
-    arch = wsme.wsattr(wtypes.text)
-    distro = wsme.wsattr(wtypes.text)
+    ver = wsme.wsattr(wtypes.text, readonly=True)
+    arch = wsme.wsattr(wtypes.text, readonly=True)
+    distro = wsme.wsattr(wtypes.text, readonly=True)
     profile = wsme.wsattr(wtypes.text)
     provmethod = wsme.wsattr(wtypes.text)
     rootfstype = wsme.wsattr(wtypes.text)
-    orig_name = wsme.wsattr(wtypes.text)
+    orig_name = wsme.wsattr(wtypes.text, readonly=True)
 
     def __init__(self, **kwargs):
         self.fields = []
@@ -78,7 +80,8 @@ class OSImagePatchType(types.JsonPatchType):
 
     @staticmethod
     def internal_attrs():
-        defaults = types.JsonPatchType.internal_attrs()
+        defaults = ['/created_at', '/id', '/ver', '/distro',
+                    '/arch', '/updated_at', '/orig_name']
         return defaults
 
 
@@ -92,7 +95,7 @@ class OSImageCollection(collection.Collection):
         self._type = 'images'
 
     @staticmethod
-    def convert_with_links(images, url=None, fields=None,**kwargs):
+    def convert_with_links(images, url=None, fields=None, **kwargs):
         collection = OSImageCollection()
         collection.images = [OSImage.convert_with_links(n, fields=fields)
                              for n in images]
@@ -175,6 +178,14 @@ class OSImageController(rest.RestController):
         """
         context = pecan.request.context
         image_obj = objects.OSImage.get_by_name(context, name)
+        filters = {'osimage_id': image_obj.id}
+        db_nodes = dbapi.get_node_list(filters=filters, fields=['name', ])
+        nodes = [node[0] for node in db_nodes]
+        if len(nodes) > 0:
+            raise exception.ResourceInUsing(res=image_obj.name,
+                                            target=','.join(nodes))
+        pecan.request.rpcapi.destroy_osimage(pecan.request.context, image_obj)
+        plugin_utils.destroy_osimages(image_obj)
         image_obj.destroy()
 
     @expose.expose(OSImage, types.name, body=[OSImagePatchType])

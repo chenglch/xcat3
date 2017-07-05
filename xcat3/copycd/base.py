@@ -16,7 +16,6 @@ from oslo_config import cfg
 from oslo_log import log as logging
 from oslo_service import loopingcall
 from oslo_utils import fileutils
-import shutil
 
 from xcat3.common.i18n import _
 from xcat3.common import exception
@@ -87,16 +86,21 @@ class Image(object):
             pass
 
         if locals['returncode'] is None or locals['returncode'] != 0:
-            raise
+            raise exception.CommandFailed(cmd=' '.join(args2))
 
         os.chdir(cur_dir)
 
-    def _copy_to_tftp(self, kernel_path, initrd_path, tftp_kernel_path,
-                      tftp_initrd_path):
-        fileutils.ensure_tree(tftp_kernel_path)
-        fileutils.ensure_tree(tftp_initrd_path)
-        shutil.copy(kernel_path, os.path.join(tftp_kernel_path, 'vmlinuz'))
-        shutil.copy(initrd_path, os.path.join(tftp_initrd_path, 'initrd.img'))
+    def _link_to_netboot(self, kernel, initrd, target):
+        fileutils.ensure_tree(target)
+        netboot_kernel = os.path.join(target, 'vmlinuz')
+        netboot_initrd = os.path.join(target, 'initrd.img')
+        # create link for netboot
+        relative_source_path = os.path.relpath(kernel,
+                                               os.path.dirname(netboot_kernel))
+        utils.create_link_without_raise(relative_source_path, netboot_kernel)
+        relative_source_path = os.path.relpath(initrd,
+                                               os.path.dirname(netboot_initrd))
+        utils.create_link_without_raise(relative_source_path, netboot_initrd)
 
     @abc.abstractmethod
     def parse_info(self):
@@ -116,30 +120,32 @@ class Image(object):
         self.dist_path = os.path.join(self.install_dir, self.dist_name,
                                       dist_info['arch'])
         self._cpio(self.dist_path)
+        kernel_path = self._get_kernel_path(dist_info)
+        initrd_path = self._get_initrd_path(dist_info)
         if dist_info['arch'] == 'x86_64':
-            kernel_path = self._get_kernel_path(dist_info)
-            initrd_path = self._get_initrd_path(dist_info)
-
-            tftp_initrd_path = os.path.join(CONF.deploy.tftp_dir, 'images',
-                                            self.dist_name, dist_info['arch'])
-            tftp_kernel_path = os.path.join(CONF.deploy.tftp_dir, 'images',
-                                            self.dist_name, dist_info['arch'])
-            self._copy_to_tftp(kernel_path, initrd_path, tftp_kernel_path,
-                               tftp_initrd_path)
+            target = os.path.join(CONF.deploy.tftp_dir, 'images',
+                                  self.dist_name, dist_info['arch'])
+        elif dist_info['arch'] == 'ppc64le' or dist_info['arch'] == 'ppc64el':
+            target = os.path.join(self.dist_path, 'xcat')
+        else:
+            msg = _("Unsupported arch %s" % dist_info['arch'])
+            raise exception.UnExpectedError(err=msg)
+        self._link_to_netboot(kernel_path, initrd_path, target)
 
     def upload(self, dist_info, path):
         """Upload image information to database"""
         print('Uploading image information...')
         dist_name = "%s%s" % (dist_info['product'], dist_info['version'])
-        osimage_name = "%s-%s" % (dist_name, dist_info['arch'])
+        if self.name is None:
+            self.name = "%s-%s" % (dist_name, dist_info['arch'])
         try:
-            image_obj = objects.OSImage.get_by_name(None, osimage_name)
-            for k, v in six.iteritems(dist_info):
-                setattr(image_obj, k, v)
+            image_obj = objects.OSImage.get_by_distro_info(None,
+                dist_info['product'], dist_info['version'], dist_info['arch'])
+            image_obj.name = self.name
             image_obj.orig_name = path
             image_obj.save()
         except exception.OSImageNotFound:
-            image_dict = {"name": osimage_name,
+            image_dict = {"name": self.name,
                           "arch": dist_info['arch'],
                           "ver": dist_info['version'],
                           "distro": dist_info['product'],

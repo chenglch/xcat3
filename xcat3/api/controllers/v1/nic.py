@@ -73,7 +73,7 @@ class Nic(base.APIBase):
 
         # never expose the node_id attribute
         nic.node_id = wtypes.Unset
-        nic.ip = unicode(nic.ip)
+        nic.ip = unicode(nic.ip) if nic.ip is not None else None
         return nic
 
     @classmethod

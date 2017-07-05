@@ -1,0 +1,5 @@
+default xCAT3
+label xCAT3
+        kernel {{kernel}}
+        initrd {{initrd}}
+        append "quiet {{os_boot_str}} locale=en_US priority=critical hostname={{node}} console=tty0 console=hvc0,115200"

@@ -43,29 +43,6 @@ class Connection(object):
         """Constructor."""
 
     @abc.abstractmethod
-    def get_nodeinfo_list(self, columns=None, filters=None, sort_key=None,
-                          sort_dir=None):
-        """Get specific columns for matching nodes.
-
-        Return a list of the specified columns for all nodes that match the
-        specified filters.
-
-        :param columns: List of column names to return.
-                        Defaults to 'id' column when columns == None.
-        :param filters: Filters to apply. Defaults to None.
-                        :reserved: True | False
-                        :reserved_by_any_of: [conductor1, conductor2]
-                        :provision_state: provision state of node
-                        :provisioned_before:
-                            nodes with provision_updated_at field before this
-                            interval in seconds
-        :param sort_key: Attribute by which results should be sorted.
-        :param sort_dir: direction in which results should be sorted.
-                         (asc, desc)
-        :returns: A list of tuples of the specified columns.
-        """
-
-    @abc.abstractmethod
     def get_node_list(self, filters=None, limit=None, marker=None,
                       sort_key=None, sort_dir=None, fields=None):
         """Return a list of nodes.
@@ -280,6 +257,10 @@ class Connection(object):
     @abc.abstractmethod
     def get_image_by_name(self, name):
         """Get image from name"""
+
+    @abc.abstractmethod
+    def get_image_by_disto_info(self, product, version, arch):
+        """Get image from distro info"""
 
     @abc.abstractmethod
     def get_image_list(self):

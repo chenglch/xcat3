@@ -1,12 +1,9 @@
 # coding=utf-8
 
-import abc
 import os
-import six
 from oslo_config import cfg
 
-from xcat3.common import utils
-from xcat3.plugins.os import base
+from xcat3.plugins.osimage import base
 from xcat3.plugins import utils as plugin_utils
 
 CONF = cfg.CONF
@@ -31,11 +28,11 @@ class UbuntuInterface(base.BaseOSImage):
         :returns command line string for os repo
         """
         opts = []
-        mirror = '%s%s/%s' % (osimage.distro, osimage.ver, osimage.arch)
         opts.append('url=http://%s/install/autoinst/'
                     '%s' % (CONF.conductor.host_ip,node.name))
         opts.append('live-installer/net-image=http://%s/install/%s/install/'
-                    'filesystem.squashfs' %(CONF.conductor.host_ip, mirror))
+                    'filesystem.squashfs' %(CONF.conductor.host_ip,
+                                            plugin_utils.get_mirror(osimage)))
         opts.append('netcfg/choose_interface=%s' % node.mac)
         opts.append('mirror/http/hostname=%s' % CONF.conductor.host_ip)
         return ' '.join(opts)

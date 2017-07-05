@@ -201,8 +201,6 @@ class Node(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         """
         ids = [node.id for node in nodes]
         cls.dbapi.destroy_nodes(ids)
-        for node in nodes:
-            node.obj_reset_changes()
 
     @classmethod
     def update_nodes(cls, nodes):

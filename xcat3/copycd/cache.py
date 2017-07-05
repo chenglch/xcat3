@@ -26,8 +26,9 @@ def copy_image(src, dst):
             sendfile.sendfile(d.fileno(), s.fileno(), offset, filesize)
 
 
-def backup_iso(iso, install_dir, image):
+def backup_iso(iso, install_dir):
     iso_dir = os.path.join(install_dir, 'iso')
+    image = os.path.splitext(os.path.basename(iso))[0]
     backup_path = os.path.join(iso_dir, '%s.iso' % image)
     if not os.path.exists(backup_path):
         print(_("Copy iso from %(src)s to %(dst)s" % {'src': iso,

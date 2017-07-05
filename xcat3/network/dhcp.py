@@ -57,7 +57,8 @@ class ISCDHCPService(DhcpBase):
     PID_PATH = '/var/run/xcat3/dhcpd.pid'
     LEASE_PATH = '/var/lib/xcat3/dhcpd.leases'
     DHCP_DICT = {'66': 'server.server-name', '67': 'server.filename',
-                 '12': 'host-name', '15': 'server.ddns-hostname'}
+                 '12': 'host-name', '15': 'server.ddns-hostname',
+                 '209': 'conf-file'}
     dbapi = db_api.get_instance()
     tmpl = None
 
@@ -150,8 +151,8 @@ class ISCDHCPService(DhcpBase):
     def _build_supersede(cls, opts):
         """Generate dhop configuration content from dhcp option dict"""
         statements = []
-        opt = opts.pop('67')
-        if opt and type(opt) == dict:
+        opt = opts.pop('67', None)
+        if type(opt) == dict:
             conf = str()
             first = True
             for k, v in six.iteritems(opt):
@@ -168,12 +169,12 @@ class ISCDHCPService(DhcpBase):
                     conf += ' else { \n\t  supersede server.filename = "%s";' \
                             '\n\t} ' % v
             statements.append(conf)
-        elif opt:
-            conf = 'supersede %s = "%s";' % (cls.DHCP_DICT.get('67'), opt)
+        elif opt is not None:
+            conf = 'supersede %s = "%s";' % (cls.DHCP_DICT['67'], opt)
             statements.append(conf)
 
         for k, v in six.iteritems(opts):
-            conf = '\tsupersede %s = "%s";' % (cls.DHCP_DICT.get(k), v)
+            conf = '\tsupersede %s = "%s";' % (cls.DHCP_DICT[k], v)
             statements.append(conf)
             if k == '66':
                 conf = '\tsupersede server.next-server %s;' % v

@@ -3,6 +3,7 @@ import os
 from oslo_log import log
 from oslo_config import cfg
 
+from xcat3.common import exception
 from xcat3.copycd import base
 
 LOG = log.getLogger(__name__)
@@ -140,7 +141,7 @@ class RedhatImage(base.Image):
 
     def _parse_enterprise_info(self, parts):
         if len(parts) >= 5:
-            if "Pegas" in parts[4] and len(parts) >5:
+            if "Pegas" in parts[4] and len(parts) > 5:
                 product = "rhels-pegas"
                 version = parts[5]
             else:
@@ -168,7 +169,7 @@ class RedhatImage(base.Image):
             id = f.readline().strip()
             desc = f.readline().strip()
             arch = f.readline().strip()
-            #TODO: Do not support inspection temporarily.
+            # TODO: Do not support inspection temporarily.
             no = f.readline().strip()
             desc_parts = desc.split()
 
@@ -181,7 +182,7 @@ class RedhatImage(base.Image):
                 elif 'IBM_PowerKVM' in desc:
                     product = 'pkvm'
                     version = desc_parts[1]
-                #TODO(chenglch): Do not support centos temprarily.
+                # TODO(chenglch): Do not support centos temprarily.
                 else:
                     return None
 
@@ -193,15 +194,28 @@ class RedhatImage(base.Image):
 
     def _get_kernel_path(self, dist_info):
         if dist_info['arch'] == 'x86_64':
-            return os.path.join(self.dist_path, 'images', 'pxeboot', 'vmlinuz')
+            kernel = os.path.join(self.dist_path, 'images', 'pxeboot',
+                                  'vmlinuz')
         elif dist_info['arch'] == 'ppc64le':
-            return os.path.join(self.dist_path, 'ppc', 'ppc64', 'vmlinuz')
-        raise
+            kernel = os.path.join(self.dist_path, 'ppc', 'ppc64', 'vmlinuz')
+        else:
+            msg = _("Unsupported arch %s" % dist_info['arch'])
+            raise exception.UnExpectedError(err=msg)
+
+        if not os.path.isfile(kernel):
+            raise exception.FileNotFound(file=kernel)
+        return kernel
 
     def _get_initrd_path(self, dist_info):
         if dist_info['arch'] == 'x86_64':
-            return os.path.join(self.dist_path, 'images', 'pxeboot',
-                                'initrd.img')
+            initrd = os.path.join(self.dist_path, 'images', 'pxeboot',
+                                  'initrd.img')
         elif dist_info['arch'] == 'ppc64le':
-            return os.path.join(self.dist_path, 'ppc', 'ppc64', 'initrd.img')
-        raise
+            initrd = os.path.join(self.dist_path, 'ppc', 'ppc64', 'initrd.img')
+        else:
+            msg = _("Unsupported arch %s" % dist_info['arch'])
+            raise exception.UnExpectedError(err=msg)
+
+        if not os.path.isfile(initrd):
+            raise exception.FileNotFound(file=initrd)
+        return initrd

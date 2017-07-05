@@ -38,6 +38,7 @@ from xcat3 import objects
 from xcat3.common import states as xcat3_states
 from xcat3.common.i18n import _, _LE, _LI, _LW
 from xcat3.plugins import mapping
+from xcat3.plugins import utils as plugin_utils
 
 MANAGER_TOPIC = 'xcat3.conductor_manager'
 
@@ -183,15 +184,23 @@ class ConductorManager(base_manager.BaseConductorManager):
         with task_manager.acquire(context, names,
                                   purpose='nodes deletion') as task:
             nodes = task.nodes
+            msg = _("Can not delete node in %(state)s state" % {
+                'state': xcat3_states.DEPLOY_NODESET})
+            # NOTE: If node is deploying, destroying is not allowed.
+            result = dict((node.name, msg) for node in nodes if
+                          node.state == xcat3_states.DEPLOY_NODESET)
+            nodes = [node for node in nodes if
+                     node.state != xcat3_states.DEPLOY_NODESET]
+            if len(nodes) == 0:
+                return result
             # remove record about dhcp in database if exist, but do not disable
             # the dhcp service immediately.
             dhcp.ISCDHCPService.update_opts(context, 'remove', names, None)
-            # TODO(chenglch): If node is in nodeset state, do not allow this
-            # operation as provision data should be clean up at first.
             objects.Node.destroy_nodes(nodes)
             LOG.info(_LI('Successfully deleted nodes %(nodes)s.'),
                      {'nodes': names})
-            result = dict((node.name, xcat3_states.DELETED) for node in nodes)
+            for node in nodes:
+                result[node.name] = xcat3_states.DELETED
             return result
 
     @messaging.expected_exceptions(exception.InvalidParameterValue,
@@ -430,7 +439,25 @@ class ConductorManager(base_manager.BaseConductorManager):
                                   purpose='node provision callback') as task:
             node = task.nodes[0]
             boot_plugin = self.plugins.get_boot_plugin(node)
-            boot_plugin.continue_deploy(node)
+            boot_plugin.continue_deploy(node, self.plugins)
+            os_plugin = self.plugins.get_osimage_plugin('base')
+            os_plugin.clean(node)
+
             node.state = xcat3_states.DEPLOY_DONE
             node.conductor_affinity = None
+            node.osimage_id = None
             objects.Node.save_nodes([node])
+
+    @messaging.expected_exceptions(exception.NoFreeServiceWorker,
+                                   exception.NodeLocked)
+    def destroy_osimage(self, context, osimage):
+        """RPC method to get a node's power state.
+
+        :param context: an admin context.
+        :param osimage: the osimage object.
+        :raises: NoFreeServiceWorker when there is no free worker to start
+                 async task.
+        """
+        LOG.info("RPC destroy_osimage called for osimage %(osimage)s. ",
+                 {'osimage': osimage.name})
+        plugin_utils.destroy_osimages(osimage)

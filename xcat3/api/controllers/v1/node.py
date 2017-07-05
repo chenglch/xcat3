@@ -24,6 +24,8 @@ import xcat3.conf
 import six
 from six.moves import http_client
 import traceback
+
+from xcat3.common import boot_device
 from xcat3.common import exception
 from xcat3.common import utils
 from xcat3.common import states
@@ -46,13 +48,11 @@ _DEFAULT_RETURN_FIELDS = ('name', 'reservation', 'created_at', 'nics_info',
                           'state', 'task_action', 'type', 'arch', 'mgt',
                           'updated_at', 'id')
 _UNSET_NODE_FIELDS = ('id', 'created_at', 'updated_at')
+# node name can not be the rest internal names
 _REST_RESOURCE = ('power', 'provision', 'boot_device')
 # for passwd
 SYSTEM_KEY = 'system'
 DEFAULT_PASSWORD = 'cluster'
-
-ALLOWED_TARGET_POWER_STATES = (xcat3_states.POWER_ON,
-                               xcat3_states.POWER_OFF)
 
 dbapi = base.dbapi
 
@@ -167,7 +167,7 @@ class Node(base.APIBase):
     def get_node_detail(cls, context, dct, fields):
         if dct.has_key('conductor_affinity') and dct[
             'conductor_affinity'] is not None:
-            #TODO: As conductor do not have object related, use dbapi directly
+            # TODO: As conductor do not have object related, use dbapi directly
             cond = dbapi.get_service_from_id(dct['conductor_affinity'])
             del dct['conductor_affinity']
             dct['conductor'] = cond.hostname
@@ -236,7 +236,7 @@ class NodeCollection(collection.Collection):
             if osimage_id is not None:
                 osimage = osimage_cache.get(osimage_id)
                 if osimage is None:
-                    osimage = objects.OSImage.get_by_id(context,osimage_id)
+                    osimage = objects.OSImage.get_by_id(context, osimage_id)
                     osimage_cache[osimage_id] = osimage
                 del dct['osimage_id']
                 dct['osimage'] = osimage.name
@@ -269,7 +269,7 @@ class NodeProvisionController(rest.RestController):
         :raises: Invalid (HTTP 400) if timeout value is less than 1.
 
         """
-        names = [node.name for node in nodes.nodes if node.name]
+        names = [node.name for node in nodes.nodes]
         if not names:
             raise exception.InvalidParameterValue(
                 _("The node %(node)s is invalid") % {'node': nodes})
@@ -349,7 +349,11 @@ class BootDeviceController(rest.RestController):
         :param boot_device: the boot device.
         :returns: json format about the status of nodes
         """
-        names = [node.name for node in nodes.nodes if node.name]
+        if target not in boot_device.BOOT_DEVS:
+            msg = _("Boot device %s is not supported. Supported options are "
+                    "%s" % (target, ' '.join(boot_device.BOOT_DEVS)))
+            raise exception.InvalidParameterValue(msg)
+        names = [node.name for node in nodes.nodes]
         result, names = _filter_unavailable_nodes(names)
         futures = pecan.request.rpcapi.set_boot_device(
             pecan.request.context, names, target)
@@ -363,7 +367,7 @@ class BootDeviceController(rest.RestController):
         :param nodes: list of node to check
         :returns: json format about the status of nodes
         """
-        names = [node.name for node in nodes.nodes if node.name]
+        names = [node.name for node in nodes.nodes]
         result, names = _filter_unavailable_nodes(names)
         futures = pecan.request.rpcapi.get_boot_device(
             pecan.request.context, names)
@@ -378,7 +382,7 @@ class NodePowerController(rest.RestController):
 
         :param node_name: The name of a node.
         """
-        names = [node.name for node in nodes.nodes if node.name]
+        names = [node.name for node in nodes.nodes]
         result, names = _filter_unavailable_nodes(names)
         futures = pecan.request.rpcapi.get_power_state(
             pecan.request.context, names)
@@ -403,7 +407,7 @@ class NodePowerController(rest.RestController):
         :raises: Invalid (HTTP 400) if timeout value is less than 1.
 
         """
-        names = [node.name for node in nodes.nodes if node.name]
+        names = [node.name for node in nodes.nodes]
         result, names = _filter_unavailable_nodes(names)
         futures = pecan.request.rpcapi.change_power_state(
             pecan.request.context, names, target=target)
@@ -459,7 +463,7 @@ class NodesController(rest.RestController):
 
     @expose.expose(types.jsontype, types.listtype, body=NodeCollection)
     def info(self, fields=None, nodes=None):
-        names = [node.name for node in nodes.nodes if node.name]
+        names = [node.name for node in nodes.nodes]
         context = pecan.request.context
         obj_info = []
         if fields is None or 'nics_info' in fields:
@@ -471,7 +475,7 @@ class NodesController(rest.RestController):
     def get_one(self, node_name, fields=None):
         context = pecan.request.context
         node = Node.get_api_node(node_name)
-        node_dict= api_utils.get_node_obj(node).as_dict()
+        node_dict = api_utils.get_node_obj(node).as_dict()
         return Node.get_node_detail(context, node_dict, fields)
 
     @expose.expose(types.jsontype, wtypes.text, wtypes.text, wtypes.text,
@@ -486,8 +490,8 @@ class NodesController(rest.RestController):
         """
         fields = ['name', ]
         # TODO(chenglch): limit is not supported very well
-        db_nodes = dbapi.get_node_list(sort_key=sort_key, sort_dir=sort_dir,
-                                       fields=fields)
+        db_nodes = dbapi.get_node_list(filters=None, sort_key=sort_key,
+                                       sort_dir=sort_dir, fields=fields)
         results = {'nodes': []}
         results['nodes'] = [node[0] for node in db_nodes]
         return results
@@ -548,7 +552,7 @@ class NodesController(rest.RestController):
             :return: json type result
             """
             names = [node.name for node in nodes]
-            exist_names = dbapi.get_node_list(names, fields=['name', ])
+            exist_names = dbapi.get_node_in(names, fields=['name', ])
             exist_names = [name[0] for name in exist_names]
             dups = utils.get_duplicate_list(names + exist_names)
             msg = _("Error: duplicate name")
@@ -583,7 +587,7 @@ class NodesController(rest.RestController):
         :return: json fomat result
         """
 
-        names = [node.name for node in nodes.nodes if node.name]
+        names = [node.name for node in nodes.nodes]
         result, names = _filter_unavailable_nodes(names)
         if not names:
             return types.JsonType.validate(result)

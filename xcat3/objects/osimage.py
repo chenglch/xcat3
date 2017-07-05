@@ -62,6 +62,19 @@ class OSImage(base.XCAT3Object, object_base.VersionedObjectDictCompat):
         return image
 
     @classmethod
+    def get_by_distro_info(cls, context, distro, ver, arch):
+        """Return a image with the given properties.
+
+        :param product: the os distro, like Ubuntu, Redhat etc.
+        :param version: the version of distro.
+        :param arch: the arch of distro.
+        :returns: a :class:`OSImage` object.
+        """
+        db_image = cls.dbapi.get_image_by_disto_info(distro, ver, arch)
+        image = cls._from_db_object(cls(context), db_image)
+        return image
+
+    @classmethod
     def list(cls, context):
         """Return a list of OSImage objects.
 
