@@ -279,6 +279,7 @@ class ConductorManager(base_manager.BaseConductorManager):
             osimage = osimage or node.osimage
             node.osimage_id = osimage.id
             os_plugin = self.plugins.get_osimage_plugin(osimage)
+            os_plugin.validate(node, osimage)
             os_boot_str = os_plugin.build_os_boot_str(node, osimage)
             # if password is encrypted, all of the nodes are deployed with the
             # same hashed password, if unhashed password is given, the hashed
@@ -322,6 +323,9 @@ class ConductorManager(base_manager.BaseConductorManager):
                 # update attributes in database
                 objects.Node.save_nodes(nodes)
             except Exception as e:
+                LOG.exception(_LE(
+                    'Unexpected exception happends when provisioning nodes: '
+                    '%(err)s'), {'err': six.text_type(traceback.format_exc())})
                 utils.fill_result(result, names, e.message)
 
             return result

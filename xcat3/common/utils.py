@@ -625,7 +625,7 @@ def fill_result(result, names, message):
     :param message: the return message for each node
     """
     for name in names:
-        result[name] = result.get(name) or message
+        result[name] = message
 
 
 def fill_dict_result(result, dict_ret):

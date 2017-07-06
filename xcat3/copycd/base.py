@@ -111,7 +111,7 @@ class Image(object):
         """Return the dist kernel path in install directory"""
 
     @abc.abstractmethod
-    def _get_kernel_path(self, dist_info):
+    def _get_initrd_path(self, dist_info):
         """Return the dist initrd path in install directory"""
 
     def copycd(self, dist_info):

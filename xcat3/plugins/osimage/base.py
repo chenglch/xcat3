@@ -9,6 +9,7 @@ import weakref
 from oslo_config import cfg
 
 from xcat3.common import utils
+from xcat3.common import exception
 from xcat3.plugins import base
 from xcat3.plugins import utils as plugin_utils
 from oslo_utils import fileutils
@@ -39,11 +40,13 @@ class OSImageInterface(base.BaseInterface):
         """Return pkg list form pkg template"""
 
     @abc.abstractmethod
-    def validate(self, node):
+    def validate(self, node, osimage):
         """validate the specific attribute
 
         :param node: the node to act on.
-        :raises: MissingParameterValue if a required parameter is missing.
+        :param osimage: osimage object.
+        :raises: InvalidParameterValue when the arch from node and osimage
+            clould not match.
         """
         pass
 
@@ -89,13 +92,17 @@ class BaseOSImage(OSImageInterface):
         self.packages = self._get_pkg_list()
         self.tmpl = None
 
-    def validate(self, node):
+    def validate(self, node, osimage):
         """validate the specific attribute
 
         :param node: the node to act on.
-        :raises: MissingParameterValue if a required parameter is missing.
+        :raises: InvalidParameterValue when the arch from node and osimage
+            clould not match.
         """
-        pass
+        if node.arch and node.arch !=  osimage.arch:
+            msg = _("The arch %s of node and arch %s of osimage could not "
+                    "match" % (node.arch, osimage.arch))
+            raise exception.InvalidParameterValue(msg)
 
     def _get_pkg_list(self):
         """Return pkg list form pkg template"""
