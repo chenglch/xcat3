@@ -274,10 +274,7 @@ class ConductorManager(base_manager.BaseConductorManager):
                 node.state = xcat3_states.DEPLOY_DHCP
                 return
 
-            node.state = xcat3_states.DEPLOY_NODESET
-            node.conductor_affinity = self.service.id
             osimage = osimage or node.osimage
-            node.osimage_id = osimage.id
             os_plugin = self.plugins.get_osimage_plugin(osimage)
             os_plugin.validate(node, osimage)
             os_boot_str = os_plugin.build_os_boot_str(node, osimage)
@@ -288,6 +285,10 @@ class ConductorManager(base_manager.BaseConductorManager):
                                                    passwd.crypt_method)
             os_plugin.build_template(node, osimage, password)
             boot_plugin.build_boot_conf(node, os_boot_str, osimage)
+            # update the node status into node object
+            node.state = xcat3_states.DEPLOY_NODESET
+            node.conductor_affinity = self.service.id
+            node.osimage_id = osimage.id
 
         # main function for provision
         LOG.info(_LI("RPC provision called for nodes %(nodes)s. "
@@ -320,7 +321,7 @@ class ConductorManager(base_manager.BaseConductorManager):
             try:
                 dhcp.ISCDHCPService.update_opts(context, 'add', names,
                                                 dhcp_opts)
-                # update attributes in database
+                # update nodes attributes into database
                 objects.Node.save_nodes(nodes)
             except Exception as e:
                 LOG.exception(_LE(
@@ -449,7 +450,6 @@ class ConductorManager(base_manager.BaseConductorManager):
 
             node.state = xcat3_states.DEPLOY_DONE
             node.conductor_affinity = None
-            node.osimage_id = None
             objects.Node.save_nodes([node])
 
     @messaging.expected_exceptions(exception.NoFreeServiceWorker,
