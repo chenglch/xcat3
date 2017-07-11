@@ -4,6 +4,7 @@ Build netboot image from ISO
 """
 
 import sys
+import traceback
 
 from oslo_config import cfg
 
@@ -48,4 +49,8 @@ def main():
         sys.argv.insert(1, 'create')
 
     service.prepare_service(sys.argv)
-    CONF.command.func()
+    try:
+        CONF.command.func()
+    except Exception:
+        print (traceback.format_exc())
+        sys.exit(1)

@@ -86,7 +86,10 @@ class Image(object):
             pass
 
         if locals['returncode'] is None or locals['returncode'] != 0:
-            raise exception.CommandFailed(cmd=' '.join(args2))
+            raise exception.CommandFailed(
+                cmd='cd %s; %s | %s' % (self.mnt_dir,
+                                        ' '.join(args1),
+                                        ' '.join(args2)))
 
         os.chdir(cur_dir)
 
