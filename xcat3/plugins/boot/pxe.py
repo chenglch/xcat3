@@ -35,7 +35,7 @@ class PXEBoot(base.BootInterface):
             os.path.dirname(self._get_config_path(node)))
 
     def gen_dhcp_opts(self, node):
-        """Build the configuration file and prepare kernal and initrd
+        """Generate dhcp option dict for pxe configuration
 
         :param node: the node to act on.
         :returns dhcp_opts: dhcp option dict for this node
@@ -59,8 +59,6 @@ class PXEBoot(base.BootInterface):
 
         :param mac: A MAC address string in the format xx:xx:xx:xx:xx:xx.
         :param delimiter: The MAC address delimiter. Defaults to dash ('-').
-        :param client_id: client_id indicate InfiniBand port.
-                          Defaults is None (Ethernet)
         :returns: the path to the config file.
         """
         mac = plugin_utils.get_primary_mac_address(node)

@@ -455,7 +455,7 @@ class ConductorManager(base_manager.BaseConductorManager):
     @messaging.expected_exceptions(exception.NoFreeServiceWorker,
                                    exception.NodeLocked)
     def destroy_osimage(self, context, osimage):
-        """RPC method to get a node's power state.
+        """RPC method to destroy osimages.
 
         :param context: an admin context.
         :param osimage: the osimage object.

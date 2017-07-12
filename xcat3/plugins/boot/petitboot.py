@@ -48,7 +48,7 @@ class Petitboot(base.BootInterface):
         utils.unlink_without_raise(self._get_config_path(node))
 
     def gen_dhcp_opts(self, node):
-        """Build the configuration file and prepare kernal and initrd
+        """Generate dhcp option dict for petitboot configuration
 
         :param node: the node to act on.
         :returns dhcp_opts: dhcp option dict for this node
